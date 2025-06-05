@@ -1,0 +1,30 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<h2>Add New Device</h2>
+
+<form method="POST" action="{{ url_for('add_item') }}">
+    <label for="mac_address">MAC Address:</label><br>
+    <input type="text" id="mac_address" name="mac_address" required><br><br>
+
+    <label for="device_model">Device Model:</label><br>
+    <input type="text" id="device_model" name="device_model" required><br><br>
+
+    <label for="owner">Owner:</label><br>
+    <input type="text" id="owner" name="owner" required><br><br>
+
+    <label for="availability">Availability:</label><br>
+    <select id="availability" name="availability" required>
+        <option value="Available">Available</option>
+        <option value="In Use">In Use</option>
+    </select><br><br>
+
+    <label for="reporting_manager">Reporting Manager:</label><br>
+    <input type="text" id="reporting_manager" name="reporting_manager"><br><br>
+
+    <label for="team">Team:</label><br>
+    <input type="text" id="team" name="team"><br><br>
+
+    <button type="submit">Add Device</button>
+</form>
+{% endblock %}

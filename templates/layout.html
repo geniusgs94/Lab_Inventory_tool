@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lab Device Inventory</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Lab Device Inventory</h1>
+        <nav>
+            {% if session.get('username') %}
+                Welcome, {{ session.username }} |
+                <a href="{{ url_for('index') }}">Inventory</a> |
+                <a href="{{ url_for('add_item') }}">Add Device</a> |
+                <a href="{{ url_for('logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </nav>
+    </header>
+
+    <main>
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Lab Inventory System</p>
+    </footer>
+</body>
+</html>
