@@ -7,10 +7,26 @@ import json
 import os
 from werkzeug.security import check_password_hash
 from datetime import timedelta
+import re
+import ipaddress
 
+def format_mac_address(mac: str) -> str:
+    """Formats MAC to 00:1A:2B:3C:4D:5E and checks length"""
+    mac = re.sub(r'[^a-fA-F0-9]', '', mac).upper()
+    if len(mac) != 12:
+        raise ValueError("MAC address must have exactly 12 hexadecimal digits.")
+    return ':'.join(mac[i:i+2] for i in range(0, 12, 2))
+
+def validate_ip(ip: str) -> bool:
+    """Checks if the IP address is valid"""
+    try:
+        ipaddress.ip_address(ip)
+        return True
+    except ValueError:
+        return False
 app = Flask(__name__)
 app.secret_key = 'gaurav_secret_key_123'
-
+app.debug=True
 DB = 'inventory.db'
 app.permanent_session_lifetime = timedelta(minutes=15)
 
@@ -124,60 +140,85 @@ def index():
 @login_required
 def add_item():
     if request.method == 'POST':
-        data = (
-            request.form['mac_address'],
-            request.form['device_model'],
-            request.form['owner'],
-            request.form['availability'],
-            request.form['reporting_manager'],
-            request.form['team'],
-            request.form['rack']
-        )
-        conn = get_db_connection()
-        conn.execute('''
-            INSERT INTO devices (mac_address, device_model, owner, availability, reporting_manager, team, rack)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', data)
-        conn.commit()
-        conn.close()
-        log_change(session['username'], 'Add', data[0], {"data": data})
-        return redirect(url_for('index'))
-    return render_template('add_item.html')
+        try:
+            # 1. Validate and format MAC address
+            mac = format_mac_address(request.form['mac_address'])
+
+            # 2. Validate IP address
+            ip = request.form['ip_address']
+            if not validate_ip(ip):
+                flash("Invalid IP address format", "danger")
+                return render_template('add_item.html')
+
+            # 3. Collect other fields
+            model = request.form['device_model']
+            owner = request.form['owner']
+            availability = request.form['availability']
+            manager = request.form['reporting_manager']
+            team = request.form['team']
+            location = request.form['location']
+            lease = request.form['lease']
+
+            # 4. Insert into database
+            conn = sqlite3.connect('inventory.db')
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO devices 
+                (mac_address, device_model, owner, availability, reporting_manager, team, ip_address, location, lease)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (mac, model, owner, availability, manager, team, ip, location, lease))
+            conn.commit()
+            conn.close()
+            return redirect(url_for('index'))
+
+        except ValueError as e:
+            flash(str(e), "danger")
+            return render_template('add_item.html')
 
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_item(id):
-    conn = get_db_connection()
-    device = conn.execute('SELECT * FROM devices WHERE id = ?', (id,)).fetchone()
-    if not device:
-        return 'Device not found', 404
+    conn = sqlite3.connect('inventory.db')
+    cursor = conn.cursor()
 
     if request.method == 'POST':
-        new_data = {
-            'mac_address': request.form['mac_address'],
-            'device_model': request.form['device_model'],
-            'owner': request.form['owner'],
-            'availability': request.form['availability'],
-            'reporting_manager': request.form['reporting_manager'],
-            'team': request.form['team'],
-            'rack': request.form['rack']
-        }
-        conn.execute('''
-            UPDATE devices SET
-                mac_address = ?, device_model = ?, owner = ?, availability = ?,
-                reporting_manager = ?, team = ?, rack = ?
+        mac = request.form['mac_address']
+        model = request.form['device_model']
+        owner = request.form['owner']
+        availability = request.form['availability']
+        manager = request.form['reporting_manager']
+        team = request.form['team']
+        ip = request.form['ip_address']
+        location = request.form['location']
+        lease = request.form['lease']
+
+        cursor.execute('''
+            UPDATE devices
+            SET mac_address = ?, device_model = ?, owner = ?, availability = ?, 
+                reporting_manager = ?, team = ?, ip_address = ?, location = ?, lease = ?
             WHERE id = ?
-        ''', (*new_data.values(), id))
+        ''', (mac, model, owner, availability, manager, team, ip, location, lease, id))
+
         conn.commit()
         conn.close()
-
-        log_change(session['username'], 'Edit', device['mac_address'], {
-            "before": dict(device),
-            "after": new_data
-        })
-
         return redirect(url_for('index'))
+
+    cursor.execute('SELECT * FROM devices WHERE id = ?', (id,))
+    row = cursor.fetchone()
     conn.close()
+
+    device = {
+        'id': row[0],
+        'mac_address': row[1],
+        'device_model': row[2],
+        'owner': row[3],
+        'availability': row[4],
+        'reporting_manager': row[5],
+        'team': row[6],
+        'ip_address': row[7],
+        'location': row[8],
+        'lease': row[9]
+    }
     return render_template('edit_item.html', device=device)
 
 @app.route('/delete/<int:id>')

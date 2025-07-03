@@ -71,3 +71,22 @@ footer {
     background-color: #eaeaea;
     margin-top: 2rem;
 }
+
+/* Flash message styles */
+.success {
+    color: green;
+    background-color: #ddffdd;
+    padding: 10px;
+    border: 1px solid green;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.danger {
+    color: darkred;
+    background-color: #ffe5e5;
+    padding: 10px;
+    border: 1px solid darkred;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}

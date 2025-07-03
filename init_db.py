@@ -14,7 +14,10 @@ def init_db():
             owner TEXT NOT NULL,
             availability TEXT NOT NULL CHECK (availability IN ('Available', 'In Use')),
             reporting_manager TEXT,
-            team TEXT
+            team TEXT,
+            ip_address TEXT,
+            location TEXT,
+            lease TEXT
         );
     ''')
 

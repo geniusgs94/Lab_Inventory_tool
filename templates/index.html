@@ -29,7 +29,9 @@
             <th>Availability</th>
             <th>Reporting Manager</th>
             <th>Team</th>
-            <th>Actions</th>
+            <th>IP Address</th>
+            <th>Location</th>
+            <th>Lease</th>
         </tr>
     </thead>
     <tbody>
@@ -41,13 +43,13 @@
             <td>{{ device.availability }}</td>
             <td>{{ device.reporting_manager }}</td>
             <td>{{ device.team }}</td>
-            <td>
-                <a href="{{ url_for('edit_item', id=device.id) }}">Edit</a>
-            </td>
+            <td>{{ device.ip_address }}</td>
+            <td>{{ device.location }}</td>
+            <td>{{ device.lease }}</td>
         </tr>
         {% else %}
         <tr>
-            <td colspan="7">No devices found.</td>
+            <td colspan="9">No devices found.</td>
         </tr>
         {% endfor %}
     </tbody>
