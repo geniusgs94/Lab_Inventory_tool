@@ -2,22 +2,25 @@
 
 {% block content %}
 <h2>Device Inventory</h2>
-<form method="get" action="{{ url_for('index') }}">
-    <label for="owner">Owner:</label>
-    <input type="text" name="owner" value="{{ request.args.get('owner', '') }}">
 
-    <label for="availability">Availability:</label>
-    <select name="availability">
+<form method="get" action="{{ url_for('index') }}" class="search-form">
+    <input
+        type="text"
+        name="search"
+        placeholder="Search all fields"
+        value="{{ request.args.get('search', '') }}"
+    >
+
+    <button type="submit">Search</button>
+
+    <label for="availability" class="availability-label">Availability:</label>
+    <select name="availability" id="availability">
         <option value="">All</option>
         <option value="Available" {% if request.args.get('availability') == 'Available' %}selected{% endif %}>Available</option>
         <option value="In Use" {% if request.args.get('availability') == 'In Use' %}selected{% endif %}>In Use</option>
     </select>
 
-    <label for="team">Team:</label>
-    <input type="text" name="team" value="{{ request.args.get('team', '') }}">
-
-    <button type="submit">Filter</button>
-    <a href="{{ url_for('index') }}">Clear</a>
+    <a href="{{ url_for('index') }}" class="clear-button">Clear</a>
 </form>
 
 <table border="1">

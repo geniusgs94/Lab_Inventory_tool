@@ -10,7 +10,8 @@
         <h1>Lab Device Inventory</h1>
         <nav>
             {% if session.get('username') %}
-                Welcome, {{ session.username }} |
+                Welcome, {{ session.username }} ({{ session.role }}) |
+                <a href="{{ url_for('history') }}">History</a> |
                 <a href="{{ url_for('index') }}">Inventory</a> |
                 <a href="{{ url_for('add_item') }}">Add Device</a> |
                 <a href="{{ url_for('logout') }}">Logout</a>

@@ -5,7 +5,7 @@ def init_db():
     conn = sqlite3.connect('inventory.db')
     cursor = conn.cursor()
 
-    # Existing devices table
+    # Devices table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS devices (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,26 +21,40 @@ def init_db():
         );
     ''')
 
-    # New users table
+    # Users table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL
+            password TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('admin', 'user'))
         );
     ''')
 
-    # Insert demo user with hashed password
+    # Change logs table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS change_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            action TEXT NOT NULL,
+            item_name TEXT NOT NULL,
+            details TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        );
+    ''')
+
+    # Insert default admin user
     hashed_password = generate_password_hash("admin123")
     try:
-        cursor.execute("INSERT INTO users (username, password) VALUES (?, ?)", ("admin", hashed_password))
+        cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+                       ("admin", hashed_password, "admin"))
+        print("✅ Default admin user created.")
     except sqlite3.IntegrityError:
-        pass  # user already exists
+        print("ℹ️ Admin user already exists.")
 
     conn.commit()
     conn.close()
-    print("Database initialized with hashed passwords.")
-
+    print("✅ Database initialized successfully.")
 
 if __name__ == '__main__':
     init_db()

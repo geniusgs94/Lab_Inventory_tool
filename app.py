@@ -48,6 +48,7 @@ def login():
             session.permanent = True
             session['user_id'] = user['id']
             session['username'] = user['username']
+            session['role'] = user['role']  # ✅ Set user role in session
             flash('Logged in successfully!', 'success')
             return redirect(url_for('index'))
         else:
@@ -55,30 +56,17 @@ def login():
 
     return render_template('login.html')
 
-
 @app.route('/logout')
 def logout():
     session.clear()
     flash('Logged out successfully.', 'success')
     return redirect(url_for('login'))
 
+def is_admin():
+    return session.get('role') == 'admin'
 
-def login_required(f):
-    """
-    Apply @login_required to all routes that require authentication.
-    # Example usage:
-    @app.route('/')
-    @login_required
-    def index():
-    """
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not is_logged_in():
-            flash('Please log in to access this page.', 'error')
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
+def is_user():
+    return session.get('role') == 'user'
 
 # ----------------------------
 # Helpers
@@ -92,6 +80,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'username' not in session:
+            flash("Session expired or you are not logged in.", "danger")
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
@@ -110,25 +99,34 @@ def log_change(username, action, item_name, details):
 # ----------------------------
 
 @app.route('/')
+@login_required
 def index():
-    owner = request.args.get('owner')
+    search = request.args.get('search')
     availability = request.args.get('availability')
-    team = request.args.get('team')
 
     query = 'SELECT * FROM devices WHERE 1=1'
     params = []
 
-    if owner:
-        query += ' AND owner LIKE ?'
-        params.append(f'%{owner}%')
+    if search:
+        like = f"%{search}%"
+        query += '''
+            AND (
+                mac_address LIKE ? OR
+                device_model LIKE ? OR
+                owner LIKE ? OR
+                availability LIKE ? OR
+                reporting_manager LIKE ? OR
+                team LIKE ? OR
+                ip_address LIKE ? OR
+                location LIKE ? OR
+                lease LIKE ?
+            )
+        '''
+        params.extend([like] * 9)
 
     if availability:
         query += ' AND availability = ?'
         params.append(availability)
-
-    if team:
-        query += ' AND team LIKE ?'
-        params.append(f'%{team}%')
 
     conn = get_db_connection()
     devices = conn.execute(query, params).fetchall()
@@ -152,7 +150,7 @@ def add_item():
 
             # 3. Collect other fields
             model = request.form['device_model']
-            owner = request.form['owner']
+            owner = session['username'] if is_user() else request.form['owner']
             availability = request.form['availability']
             manager = request.form['reporting_manager']
             team = request.form['team']
@@ -175,16 +173,34 @@ def add_item():
             flash(str(e), "danger")
             return render_template('add_item.html')
 
+    # This handles the GET request
+    return render_template('add_item.html')
+
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_item(id):
     conn = sqlite3.connect('inventory.db')
+    conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
+    cursor.execute('SELECT * FROM devices WHERE id = ?', (id,))
+    device = cursor.fetchone()
+
+    if not device:
+        conn.close()
+        flash("Device not found", "danger")
+        return redirect(url_for('index'))
+
+    # Enforce user access
+    if is_user():
+        if device['owner'] != session['username'] and device['availability'] != 'Available':
+            conn.close()
+            flash("Access denied. You can't edit devices owned by others.", "danger")
+            return redirect(url_for('index'))
 
     if request.method == 'POST':
         mac = request.form['mac_address']
         model = request.form['device_model']
-        owner = request.form['owner']
+        owner = session['username'] if is_user() else request.form['owner']
         availability = request.form['availability']
         manager = request.form['reporting_manager']
         team = request.form['team']
@@ -226,10 +242,22 @@ def edit_item(id):
 def delete_item(id):
     conn = get_db_connection()
     device = conn.execute('SELECT * FROM devices WHERE id = ?', (id,)).fetchone()
-    if device:
-        conn.execute('DELETE FROM devices WHERE id = ?', (id,))
-        conn.commit()
-        log_change(session['username'], 'Delete', device['mac_address'], dict(device))
+
+    if not device:
+        conn.close()
+        flash("Device not found", "danger")
+        return redirect(url_for('index'))
+
+    # Access control
+    if is_user():
+        if device['owner'] != session['username'] and device['availability'] != 'Available':
+            conn.close()
+            flash("Access denied. You can't delete devices owned by others.", "danger")
+            return redirect(url_for('index'))
+
+    conn.execute('DELETE FROM devices WHERE id = ?', (id,))
+    conn.commit()
+    log_change(session['username'], 'Delete', device['mac_address'], dict(device))
     conn.close()
     return redirect(url_for('index'))
 
