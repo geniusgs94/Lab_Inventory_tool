@@ -3,7 +3,7 @@
 {% block content %}
 <h2>Device Inventory</h2>
 
-<form method="get" action="{{ url_for('index') }}" class="search-form">
+<form method="get" action="{{ url_for('inventory') }}" class="search-form">
     <input
         type="text"
         name="search"
@@ -14,47 +14,63 @@
     <button type="submit">Search</button>
 
     <label for="availability" class="availability-label">Availability:</label>
-    <select name="availability" id="availability">
+    <select name="availability" id="availability" onchange="this.form.submit()">
         <option value="">All</option>
         <option value="Available" {% if request.args.get('availability') == 'Available' %}selected{% endif %}>Available</option>
         <option value="In Use" {% if request.args.get('availability') == 'In Use' %}selected{% endif %}>In Use</option>
     </select>
 
-    <a href="{{ url_for('index') }}" class="clear-button">Clear</a>
+    <a href="{{ url_for('inventory') }}" class="clear-button">Clear</a>
 </form>
 
 <table border="1">
-    <thead>
-        <tr>
-            <th>MAC Address</th>
-            <th>Device Model</th>
-            <th>Owner</th>
-            <th>Availability</th>
-            <th>Reporting Manager</th>
-            <th>Team</th>
-            <th>IP Address</th>
-            <th>Location</th>
-            <th>Lease</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for device in devices %}
-        <tr>
-            <td>{{ device.mac_address }}</td>
-            <td>{{ device.device_model }}</td>
-            <td>{{ device.owner }}</td>
-            <td>{{ device.availability }}</td>
-            <td>{{ device.reporting_manager }}</td>
-            <td>{{ device.team }}</td>
-            <td>{{ device.ip_address }}</td>
-            <td>{{ device.location }}</td>
-            <td>{{ device.lease }}</td>
-        </tr>
-        {% else %}
-        <tr>
-            <td colspan="9">No devices found.</td>
-        </tr>
-        {% endfor %}
-    </tbody>
+<thead>
+    <tr>
+        <th>MAC Address</th>
+        <th>Device Model</th>
+        <th>Owner</th>
+        <th>Availability</th>
+        <th>Reporting Manager</th>
+        <th>Team</th>
+        <th>IP Address</th>
+        <th>Location</th>
+        <th>Lease</th>
+        <th>Action</th> <!-- new -->
+    </tr>
+</thead>
+<tbody>
+    {% for device in devices %}
+    <tr>
+        <td>{{ device.mac_address }}</td>
+        <td>{{ device.device_model }}</td>
+        <td>{{ device.owner }}</td>
+        <td>{{ device.availability }}</td>
+        <td>{{ device.reporting_manager }}</td>
+        <td>{{ device.team }}</td>
+        <td>{{ device.ip_address }}</td>
+        <td>{{ device.location }}</td>
+        <td>{{ device.lease }}</td>
+        <td>
+            {% if device.availability == 'Available' %}
+                <form action="{{ url_for('reserve_device', id=device.id) }}" method="post">
+                    <button type="submit">Reserve</button>
+                </form>
+            {% elif device.availability == 'In Use' and device.owner == session.username %}
+                <form action="{{ url_for('release_device', id=device.id) }}" method="post">
+                    <button type="submit">Release</button>
+                </form>
+            {% elif device.availability == 'In Use' and device.owner != session.username %}
+                <form action="{{ url_for('request_device', id=device.id) }}" method="post">
+                    <button type="submit">Request</button>
+                </form>
+            {% endif %}
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="10">No devices found.</td>
+    </tr>
+    {% endfor %}
+</tbody>
 </table>
 {% endblock %}

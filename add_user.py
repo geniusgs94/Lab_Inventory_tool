@@ -2,7 +2,7 @@ import sqlite3
 from werkzeug.security import generate_password_hash
 
 # Set the new username and password
-new_username = input("Enter new username: ")
+new_username = input("Enter new username: ").lower()
 new_password = input("Enter new password: ")
 new_role = input("Enter role (admin/user): ").strip().lower()
 # Hash the password

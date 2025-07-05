@@ -37,7 +37,7 @@ def is_logged_in():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
+        username = request.form['username'].lower()
         password = request.form['password']
 
         conn = get_db_connection()
@@ -50,7 +50,7 @@ def login():
             session['username'] = user['username']
             session['role'] = user['role']  # ✅ Set user role in session
             flash('Logged in successfully!', 'success')
-            return redirect(url_for('index'))
+            return redirect(url_for('inventory'))
         else:
             flash('Invalid username or password', 'error')
 
@@ -99,8 +99,14 @@ def log_change(username, action, item_name, details):
 # ----------------------------
 
 @app.route('/')
+def home():
+    if 'username' in session:
+        return redirect(url_for('inventory'))
+    return redirect(url_for('login'))
+
+@app.route('/inventory')
 @login_required
-def index():
+def inventory():
     search = request.args.get('search')
     availability = request.args.get('availability')
 
@@ -157,9 +163,16 @@ def add_item():
             location = request.form['location']
             lease = request.form['lease']
 
-            # 4. Insert into database
+            # 4. Check for duplicate MAC address
             conn = sqlite3.connect('inventory.db')
             cursor = conn.cursor()
+            existing = cursor.execute("SELECT 1 FROM devices WHERE mac_address = ?", (mac,)).fetchone()
+            if existing:
+                flash("MAC address already exists.", "danger")
+                conn.close()
+                return render_template('add_item.html')
+
+            # 5. Insert into database
             cursor.execute('''
                 INSERT INTO devices 
                 (mac_address, device_model, owner, availability, reporting_manager, team, ip_address, location, lease)
@@ -167,7 +180,7 @@ def add_item():
             ''', (mac, model, owner, availability, manager, team, ip, location, lease))
             conn.commit()
             conn.close()
-            return redirect(url_for('index'))
+            return redirect(url_for('inventory'))
 
         except ValueError as e:
             flash(str(e), "danger")
@@ -188,14 +201,14 @@ def edit_item(id):
     if not device:
         conn.close()
         flash("Device not found", "danger")
-        return redirect(url_for('index'))
+        return redirect(url_for('inventory'))
 
     # Enforce user access
     if is_user():
         if device['owner'] != session['username'] and device['availability'] != 'Available':
             conn.close()
             flash("Access denied. You can't edit devices owned by others.", "danger")
-            return redirect(url_for('index'))
+            return redirect(url_for('inventory'))
 
     if request.method == 'POST':
         mac = request.form['mac_address']
@@ -217,7 +230,7 @@ def edit_item(id):
 
         conn.commit()
         conn.close()
-        return redirect(url_for('index'))
+        return redirect(url_for('inventory'))
 
     cursor.execute('SELECT * FROM devices WHERE id = ?', (id,))
     row = cursor.fetchone()
@@ -237,6 +250,76 @@ def edit_item(id):
     }
     return render_template('edit_item.html', device=device)
 
+@app.route('/reserve/<int:id>', methods=['POST'])
+@login_required
+def reserve_device(id):
+    conn = get_db_connection()
+    device = conn.execute('SELECT * FROM devices WHERE id = ?', (id,)).fetchone()
+
+    if not device:
+        conn.close()
+        flash("Device not found.", "danger")
+        return redirect(url_for('inventory'))
+
+    if device['availability'] == 'Available':
+        conn.execute('''
+            UPDATE devices
+            SET availability = ?, owner = ?
+            WHERE id = ?
+        ''', ('In Use', session['username'], id))
+        conn.commit()
+        log_change(session['username'], 'Reserve', device['mac_address'], {'new_owner': session['username']})
+        flash("Device reserved successfully.", "success")
+    else:
+        flash("Device is not available for reservation.", "danger")
+
+    conn.close()
+    return redirect(url_for('inventory'))
+
+@app.route('/release/<int:id>', methods=['POST'])
+@login_required
+def release_device(id):
+    conn = get_db_connection()
+    device = conn.execute('SELECT * FROM devices WHERE id = ?', (id,)).fetchone()
+
+    if not device:
+        conn.close()
+        flash("Device not found.", "danger")
+        return redirect(url_for('inventory'))
+
+    if device['availability'] == 'In Use' and device['owner'] == session['username']:
+        conn.execute('''
+            UPDATE devices
+            SET availability = ?, owner = ?
+            WHERE id = ?
+        ''', ('Available', '', id))
+        conn.commit()
+        log_change(session['username'], 'Release', device['mac_address'], {'released_by': session['username']})
+        flash("Device released successfully.", "success")
+    else:
+        flash("You are not allowed to release this device.", "danger")
+
+    conn.close()
+    return redirect(url_for('inventory'))
+
+@app.route('/request/<int:id>', methods=['POST'])
+@login_required
+def request_device(id):
+    conn = get_db_connection()
+    device = conn.execute('SELECT * FROM devices WHERE id = ?', (id,)).fetchone()
+    conn.close()
+
+    if not device:
+        flash("Device not found.", "danger")
+    elif device['owner'] == session['username']:
+        flash("You already own this device.", "info")
+    else:
+        # For now just flash a message. You can later add notification logic.
+        flash(f"Request sent to owner ({device['owner']}) to use this device.", "success")
+
+    return redirect(url_for('inventory'))
+
+
 @app.route('/delete/<int:id>')
 @login_required
 def delete_item(id):
@@ -246,20 +329,23 @@ def delete_item(id):
     if not device:
         conn.close()
         flash("Device not found", "danger")
-        return redirect(url_for('index'))
+        return redirect(url_for('inventory'))
+
 
     # Access control
     if is_user():
         if device['owner'] != session['username'] and device['availability'] != 'Available':
             conn.close()
             flash("Access denied. You can't delete devices owned by others.", "danger")
-            return redirect(url_for('index'))
+            return redirect(url_for('inventory'))
+
 
     conn.execute('DELETE FROM devices WHERE id = ?', (id,))
     conn.commit()
     log_change(session['username'], 'Delete', device['mac_address'], dict(device))
     conn.close()
-    return redirect(url_for('index'))
+    return redirect(url_for('inventory'))
+
 
 @app.route('/history')
 @login_required
