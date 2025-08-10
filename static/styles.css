@@ -141,3 +141,23 @@ ul {
     display: flex;
     align-items: center;
 }
+.btn-request {
+    background-color: #ff9800;   /* Orange button */
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.btn-request:hover {
+    background-color: #e68900;  /* Darker orange on hover */
+    transform: scale(1.05);     /* Slight zoom effect */
+}
+
+.btn-request:active {
+    background-color: #cc7a00;  /* Even darker when clicked */
+}

@@ -3,37 +3,51 @@
 {% block content %}
 <h2>Edit Device</h2>
 
-<form method="POST" action="{{ url_for('edit_item', id=device.id) }}">
-    <label for="mac_address">MAC Address:</label><br>
-    <input type="text" id="mac_address" name="mac_address" value="{{ device.mac_address }}" required><br><br>
+<form action="{{ url_for('edit_item', id=device['id']) }}" method="POST">
 
-    <label for="device_model">Device Model:</label><br>
-    <input type="text" id="device_model" name="device_model" value="{{ device.device_model }}" required><br><br>
+    <!-- Device Name (readonly) -->
+    <label for="device_name">Device Name:</label>
+    <input type="text" id="device_name" name="device_name" value="{{ device['device_name'] }}" readonly>
 
-    <label for="owner">Owner:</label><br>
-    <input type="text" id="owner" name="owner" value="{{ device.owner }}" required><br><br>
+    <!-- Serial Number (readonly) -->
+    <label for="serial_number">Serial Number:</label>
+    <input type="text" id="serial_number" name="serial_number" value="{{ device['serial_number'] }}" readonly>
 
-    <label for="availability">Availability:</label><br>
-    <select id="availability" name="availability" required>
-        <option value="Available" {% if device.availability == 'Available' %}selected{% endif %}>Available</option>
-        <option value="In Use" {% if device.availability == 'In Use' %}selected{% endif %}>In Use</option>
-    </select><br><br>
+    <!-- Model (readonly) -->
+    <label for="model">Model:</label>
+    <input type="text" id="model" name="model" value="{{ device['model'] }}" readonly>
 
-    <label for="reporting_manager">Reporting Manager:</label><br>
-    <input type="text" id="reporting_manager" name="reporting_manager" value="{{ device.reporting_manager }}"><br><br>
+    <!-- Availability (editable) -->
+    <label for="availability">Availability:</label>
+    <select id="availability" name="availability">
+        <option value="Available" {% if device['availability'] == 'Available' %}selected{% endif %}>Available</option>
+        <option value="In Use" {% if device['availability'] == 'In Use' %}selected{% endif %}>In Use</option>
+        <option value="Under Maintenance" {% if device['availability'] == 'Under Maintenance' %}selected{% endif %}>Under Maintenance</option>
+    </select>
 
-    <label for="team">Team:</label><br>
-    <input type="text" id="team" name="team" value="{{ device.team }}"><br><br>
+    <!-- Reporting Manager (editable) -->
+    <label for="reporting_manager">Reporting Manager:</label>
+    <input type="text" id="reporting_manager" name="reporting_manager" value="{{ device['reporting_manager'] }}">
 
-    <label for="ip_address">IP Address:</label><br>
-    <input type="text" id="ip_address" name="ip_address" value="{{ device.ip_address }}"><br><br>
+    <!-- Team (editable) -->
+    <label for="team">Team:</label>
+    <input type="text" id="team" name="team" value="{{ device['team'] }}">
 
-    <label for="location">Location:</label><br>
-    <input type="text" id="location" name="location" value="{{ device.location }}"><br><br>
+    <!-- IP Address (editable) -->
+    <label for="ip_address">IP Address:</label>
+    <input type="text" id="ip_address" name="ip_address" value="{{ device['ip_address'] }}">
 
-    <label for="lease">Lease:</label><br>
-    <input type="text" id="lease" name="lease" value="{{ device.lease }}"><br><br>
+    <!-- Location (editable) -->
+    <label for="location">Location:</label>
+    <input type="text" id="location" name="location" value="{{ device['location'] }}">
 
-    <button type="submit">Update Device</button>
+    <!-- Notes (readonly) -->
+    <label for="notes">Notes:</label>
+    <textarea id="notes" name="notes" readonly>{{ device['notes'] }}</textarea>
+
+    <div style="margin-top: 15px;">
+        <button type="submit">Save Changes</button>
+        <a href="{{ url_for('inventory') }}" style="margin-left: 10px;">Cancel</a>
+    </div>
 </form>
 {% endblock %}

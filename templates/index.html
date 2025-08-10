@@ -10,7 +10,6 @@
         placeholder="Search all fields"
         value="{{ request.args.get('search', '') }}"
     >
-
     <button type="submit">Search</button>
 
     <label for="availability" class="availability-label">Availability:</label>
@@ -35,7 +34,8 @@
         <th>IP Address</th>
         <th>Location</th>
         <th>Lease</th>
-        <th>Action</th> <!-- new -->
+        <th>Edit</th>
+        <th>Action</th>
     </tr>
 </thead>
 <tbody>
@@ -50,25 +50,36 @@
         <td>{{ device.ip_address }}</td>
         <td>{{ device.location }}</td>
         <td>{{ device.lease }}</td>
+
+        <!-- Edit column -->
+        <td>
+            <a href="{{ url_for('edit_item', id=device.id) }}" class="btn btn-sm btn-warning" style="margin-bottom:5px; display:inline-block;">Edit</a>
+        </td>
+
+        <!-- Action column -->
         <td>
             {% if device.availability == 'Available' %}
-                <form action="{{ url_for('reserve_device', id=device.id) }}" method="post">
+                <form action="{{ url_for('reserve_device', id=device.id) }}" method="post" style="display:inline;">
                     <button type="submit">Reserve</button>
                 </form>
-            {% elif device.availability == 'In Use' and device.owner == session.username %}
-                <form action="{{ url_for('release_device', id=device.id) }}" method="post">
+
+            {% elif device.availability == 'In Use' and device.owner|lower|trim == session.username|lower|trim %}
+                <form action="{{ url_for('release_device', id=device.id) }}" method="post" style="display:inline;">
                     <button type="submit">Release</button>
                 </form>
-            {% elif device.availability == 'In Use' and device.owner != session.username %}
-                <form action="{{ url_for('request_device', id=device.id) }}" method="post">
-                    <button type="submit">Request</button>
+
+            {% elif device.availability == 'In Use' and device.owner|lower|trim != session.username|lower|trim %}
+                <form action="{{ url_for('request_device', id=device.id) }}" method="post" style="display:inline;">
+                    <button type="submit" style="background-color:#007bff; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">
+                        Request
+                    </button>
                 </form>
             {% endif %}
         </td>
     </tr>
     {% else %}
     <tr>
-        <td colspan="10">No devices found.</td>
+        <td colspan="11">No devices found.</td>
     </tr>
     {% endfor %}
 </tbody>

@@ -203,23 +203,25 @@ def edit_item(id):
         flash("Device not found", "danger")
         return redirect(url_for('inventory'))
 
-    # Enforce user access
-    if is_user():
-        if device['owner'] != session['username'] and device['availability'] != 'Available':
-            conn.close()
-            flash("Access denied. You can't edit devices owned by others.", "danger")
-            return redirect(url_for('inventory'))
+    # Only allow Admin or Owner to edit allowed fields
+    if not (is_admin() or device['owner'] == session['username']):
+        conn.close()
+        flash("Access denied. Only the owner or an admin can edit this device.", "danger")
+        return redirect(url_for('inventory'))
 
     if request.method == 'POST':
-        mac = request.form['mac_address']
-        model = request.form['device_model']
-        owner = session['username'] if is_user() else request.form['owner']
+        # These fields remain unchanged (read-only)
+        mac = device['mac_address']
+        model = device['device_model']
+        owner = device['owner']
+        lease = device['lease']
+
+        # These fields can be edited
         availability = request.form['availability']
         manager = request.form['reporting_manager']
         team = request.form['team']
         ip = request.form['ip_address']
         location = request.form['location']
-        lease = request.form['lease']
 
         cursor.execute('''
             UPDATE devices
@@ -230,25 +232,24 @@ def edit_item(id):
 
         conn.commit()
         conn.close()
+        flash("Device updated successfully.", "success")
         return redirect(url_for('inventory'))
 
-    cursor.execute('SELECT * FROM devices WHERE id = ?', (id,))
-    row = cursor.fetchone()
-    conn.close()
-
-    device = {
-        'id': row[0],
-        'mac_address': row[1],
-        'device_model': row[2],
-        'owner': row[3],
-        'availability': row[4],
-        'reporting_manager': row[5],
-        'team': row[6],
-        'ip_address': row[7],
-        'location': row[8],
-        'lease': row[9]
+    # For GET request - display the device info
+    device_dict = {
+        'id': device['id'],
+        'mac_address': device['mac_address'],
+        'device_model': device['device_model'],
+        'owner': device['owner'],
+        'availability': device['availability'],
+        'reporting_manager': device['reporting_manager'],
+        'team': device['team'],
+        'ip_address': device['ip_address'],
+        'location': device['location'],
+        'lease': device['lease']
     }
-    return render_template('edit_item.html', device=device)
+    conn.close()
+    return render_template('edit_item.html', device=device_dict)
 
 @app.route('/reserve/<int:id>', methods=['POST'])
 @login_required
