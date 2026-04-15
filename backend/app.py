@@ -1,6 +1,7 @@
 # app.py
 from flask import Flask, render_template, request, redirect, session, url_for, flash
-import sqlite3
+import psycopg2
+import psycopg2.extras
 from functools import wraps
 from datetime import datetime
 import json
@@ -9,6 +10,9 @@ from werkzeug.security import check_password_hash
 from datetime import timedelta
 import re
 import ipaddress
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def format_mac_address(mac: str) -> str:
     """Formats MAC to 00:1A:2B:3C:4D:5E and checks length"""
@@ -24,10 +28,13 @@ def validate_ip(ip: str) -> bool:
         return True
     except ValueError:
         return False
-app = Flask(__name__)
+
+app = Flask(__name__,
+            template_folder='../frontend/templates',
+            static_folder='../frontend/static')
 app.secret_key = 'gaurav_secret_key_123'
-app.debug=True
-DB = 'inventory.db'
+app.debug = True
+DATABASE_URL = os.environ.get('DATABASE_URL')
 app.permanent_session_lifetime = timedelta(minutes=15)
 
 def is_logged_in():
@@ -41,14 +48,16 @@ def login():
         password = request.form['password']
 
         conn = get_db_connection()
-        user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        cur = conn.cursor()
+        cur.execute('SELECT * FROM users WHERE username = %s', (username,))
+        user = cur.fetchone()
         conn.close()
 
         if user and check_password_hash(user['password'], password):
             session.permanent = True
             session['user_id'] = user['id']
             session['username'] = user['username']
-            session['role'] = user['role']  # ✅ Set user role in session
+            session['role'] = user['role']
             flash('Logged in successfully!', 'success')
             return redirect(url_for('inventory'))
         else:
@@ -72,8 +81,7 @@ def is_user():
 # Helpers
 # ----------------------------
 def get_db_connection():
-    conn = sqlite3.connect(DB)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     return conn
 
 def login_required(f):
@@ -87,9 +95,10 @@ def login_required(f):
 
 def log_change(username, action, item_name, details):
     conn = get_db_connection()
-    conn.execute('''
+    cur = conn.cursor()
+    cur.execute('''
         INSERT INTO change_logs (username, action, item_name, details, timestamp)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
     ''', (username, action, item_name, json.dumps(details), datetime.now().isoformat()))
     conn.commit()
     conn.close()
@@ -117,25 +126,27 @@ def inventory():
         like = f"%{search}%"
         query += '''
             AND (
-                mac_address LIKE ? OR
-                device_model LIKE ? OR
-                owner LIKE ? OR
-                availability LIKE ? OR
-                reporting_manager LIKE ? OR
-                team LIKE ? OR
-                ip_address LIKE ? OR
-                location LIKE ? OR
-                lease LIKE ?
+                mac_address LIKE %s OR
+                device_model LIKE %s OR
+                owner LIKE %s OR
+                availability LIKE %s OR
+                reporting_manager LIKE %s OR
+                team LIKE %s OR
+                ip_address LIKE %s OR
+                location LIKE %s OR
+                lease LIKE %s
             )
         '''
         params.extend([like] * 9)
 
     if availability:
-        query += ' AND availability = ?'
+        query += ' AND availability = %s'
         params.append(availability)
 
     conn = get_db_connection()
-    devices = conn.execute(query, params).fetchall()
+    cur = conn.cursor()
+    cur.execute(query, params)
+    devices = cur.fetchall()
     conn.close()
 
     return render_template('index.html', devices=devices)
@@ -164,19 +175,20 @@ def add_item():
             lease = request.form['lease']
 
             # 4. Check for duplicate MAC address
-            conn = sqlite3.connect('inventory.db')
-            cursor = conn.cursor()
-            existing = cursor.execute("SELECT 1 FROM devices WHERE mac_address = ?", (mac,)).fetchone()
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("SELECT 1 FROM devices WHERE mac_address = %s", (mac,))
+            existing = cur.fetchone()
             if existing:
                 flash("MAC address already exists.", "danger")
                 conn.close()
                 return render_template('add_item.html')
 
             # 5. Insert into database
-            cursor.execute('''
-                INSERT INTO devices 
+            cur.execute('''
+                INSERT INTO devices
                 (mac_address, device_model, owner, availability, reporting_manager, team, ip_address, location, lease)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', (mac, model, owner, availability, manager, team, ip, location, lease))
             conn.commit()
             conn.close()
@@ -192,11 +204,10 @@ def add_item():
 @app.route('/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_item(id):
-    conn = sqlite3.connect('inventory.db')
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM devices WHERE id = ?', (id,))
-    device = cursor.fetchone()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM devices WHERE id = %s', (id,))
+    device = cur.fetchone()
 
     if not device:
         conn.close()
@@ -223,11 +234,11 @@ def edit_item(id):
         ip = request.form['ip_address']
         location = request.form['location']
 
-        cursor.execute('''
+        cur.execute('''
             UPDATE devices
-            SET mac_address = ?, device_model = ?, owner = ?, availability = ?, 
-                reporting_manager = ?, team = ?, ip_address = ?, location = ?, lease = ?
-            WHERE id = ?
+            SET mac_address = %s, device_model = %s, owner = %s, availability = %s,
+                reporting_manager = %s, team = %s, ip_address = %s, location = %s, lease = %s
+            WHERE id = %s
         ''', (mac, model, owner, availability, manager, team, ip, location, lease, id))
 
         conn.commit()
@@ -255,7 +266,9 @@ def edit_item(id):
 @login_required
 def reserve_device(id):
     conn = get_db_connection()
-    device = conn.execute('SELECT * FROM devices WHERE id = ?', (id,)).fetchone()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM devices WHERE id = %s', (id,))
+    device = cur.fetchone()
 
     if not device:
         conn.close()
@@ -263,10 +276,10 @@ def reserve_device(id):
         return redirect(url_for('inventory'))
 
     if device['availability'] == 'Available':
-        conn.execute('''
+        cur.execute('''
             UPDATE devices
-            SET availability = ?, owner = ?
-            WHERE id = ?
+            SET availability = %s, owner = %s
+            WHERE id = %s
         ''', ('In Use', session['username'], id))
         conn.commit()
         log_change(session['username'], 'Reserve', device['mac_address'], {'new_owner': session['username']})
@@ -281,7 +294,9 @@ def reserve_device(id):
 @login_required
 def release_device(id):
     conn = get_db_connection()
-    device = conn.execute('SELECT * FROM devices WHERE id = ?', (id,)).fetchone()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM devices WHERE id = %s', (id,))
+    device = cur.fetchone()
 
     if not device:
         conn.close()
@@ -289,10 +304,10 @@ def release_device(id):
         return redirect(url_for('inventory'))
 
     if device['availability'] == 'In Use' and device['owner'] == session['username']:
-        conn.execute('''
+        cur.execute('''
             UPDATE devices
-            SET availability = ?, owner = ?
-            WHERE id = ?
+            SET availability = %s, owner = %s
+            WHERE id = %s
         ''', ('Available', '', id))
         conn.commit()
         log_change(session['username'], 'Release', device['mac_address'], {'released_by': session['username']})
@@ -307,7 +322,9 @@ def release_device(id):
 @login_required
 def request_device(id):
     conn = get_db_connection()
-    device = conn.execute('SELECT * FROM devices WHERE id = ?', (id,)).fetchone()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM devices WHERE id = %s', (id,))
+    device = cur.fetchone()
     conn.close()
 
     if not device:
@@ -325,13 +342,14 @@ def request_device(id):
 @login_required
 def delete_item(id):
     conn = get_db_connection()
-    device = conn.execute('SELECT * FROM devices WHERE id = ?', (id,)).fetchone()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM devices WHERE id = %s', (id,))
+    device = cur.fetchone()
 
     if not device:
         conn.close()
         flash("Device not found", "danger")
         return redirect(url_for('inventory'))
-
 
     # Access control
     if is_user():
@@ -340,8 +358,7 @@ def delete_item(id):
             flash("Access denied. You can't delete devices owned by others.", "danger")
             return redirect(url_for('inventory'))
 
-
-    conn.execute('DELETE FROM devices WHERE id = ?', (id,))
+    cur.execute('DELETE FROM devices WHERE id = %s', (id,))
     conn.commit()
     log_change(session['username'], 'Delete', device['mac_address'], dict(device))
     conn.close()
@@ -352,7 +369,9 @@ def delete_item(id):
 @login_required
 def history():
     conn = get_db_connection()
-    logs = conn.execute('SELECT * FROM change_logs ORDER BY timestamp DESC').fetchall()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM change_logs ORDER BY timestamp DESC')
+    logs = cur.fetchall()
     conn.close()
     return render_template('history.html', logs=logs)
 
@@ -360,7 +379,10 @@ def history():
 # Run Server
 # ----------------------------
 if __name__ == '__main__':
-    if not os.path.exists(DB):
-        print("❌ Database not found. Run init_db.py first.")
-    else:
-        app.run(debug=True)
+    try:
+        conn = get_db_connection()
+        conn.close()
+    except Exception as e:
+        print(f"❌ Could not connect to the database: {e}")
+        exit(1)
+    app.run(debug=True)

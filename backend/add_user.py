@@ -1,5 +1,9 @@
-import sqlite3
+import psycopg2
 from werkzeug.security import generate_password_hash
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Set the new username and password
 new_username = input("Enter new username: ").lower()
@@ -9,7 +13,7 @@ new_role = input("Enter role (admin/user): ").strip().lower()
 hashed_password = generate_password_hash(new_password)
 
 # Connect to the database
-conn = sqlite3.connect('inventory.db')
+conn = psycopg2.connect(os.environ.get('DATABASE_URL'))
 cursor = conn.cursor()
 
 # Insert new user
@@ -17,10 +21,10 @@ if new_role not in ("admin", "user"):
     print("❌ Invalid role. Only 'admin' or 'user' are allowed.")
     exit()
 try:
-    cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", (new_username, hashed_password, new_role))
+    cursor.execute("INSERT INTO users (username, password, role) VALUES (%s, %s, %s)", (new_username, hashed_password, new_role))
     conn.commit()
     print(f"User '{new_username}' added successfully.")
-except sqlite3.IntegrityError:
+except psycopg2.IntegrityError:
     print("Username already exists. Choose a different one.")
 finally:
     conn.close()

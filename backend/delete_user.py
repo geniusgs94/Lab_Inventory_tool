@@ -1,27 +1,31 @@
-import sqlite3
+import psycopg2
+import psycopg2.extras
 from datetime import datetime
 import json
+import os
+from dotenv import load_dotenv
 
-DB = 'inventory.db'
+load_dotenv()
+
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def log_change(username, action, item_name, details):
-    conn = sqlite3.connect(DB)
+    conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
     cursor.execute('''
         INSERT INTO change_logs (username, action, item_name, details, timestamp)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
     ''', (username, action, item_name, json.dumps(details), datetime.now().isoformat()))
     conn.commit()
     conn.close()
 
 
 def delete_user_and_release_devices(target_username):
-    conn = sqlite3.connect(DB)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     cursor = conn.cursor()
 
     # Check if user exists
-    cursor.execute("SELECT * FROM users WHERE username = ?", (target_username,))
+    cursor.execute("SELECT * FROM users WHERE username = %s", (target_username,))
     user = cursor.fetchone()
 
     if not user:
@@ -30,7 +34,7 @@ def delete_user_and_release_devices(target_username):
         return
 
     # Fetch devices owned by the user
-    cursor.execute("SELECT * FROM devices WHERE owner = ?", (target_username,))
+    cursor.execute("SELECT * FROM devices WHERE owner = %s", (target_username,))
     devices = cursor.fetchall()
 
     if devices:
@@ -38,9 +42,9 @@ def delete_user_and_release_devices(target_username):
         for device in devices:
             old_details = dict(device)
             cursor.execute("""
-                UPDATE devices 
+                UPDATE devices
                 SET owner = 'Unassigned', availability = 'Available'
-                WHERE id = ?
+                WHERE id = %s
             """, (device['id'],))
             log_change('admin', 'Release', device['mac_address'], {
                 'previous_owner': old_details['owner'],
@@ -48,7 +52,7 @@ def delete_user_and_release_devices(target_username):
             })
 
     # Delete the user
-    cursor.execute("DELETE FROM users WHERE username = ?", (target_username,))
+    cursor.execute("DELETE FROM users WHERE username = %s", (target_username,))
     conn.commit()
     conn.close()
     print(f"✅ User '{target_username}' deleted and devices released.")

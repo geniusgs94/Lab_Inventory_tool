@@ -1,9 +1,13 @@
-import sqlite3
+import psycopg2
+import os
+from dotenv import load_dotenv
 
-DB = 'inventory.db'
+load_dotenv()
+
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
 def delete_device(mac_address):
-    conn = sqlite3.connect(DB)
+    conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
 
     if mac_address == 'masterkeygaurav':
@@ -15,10 +19,10 @@ def delete_device(mac_address):
         else:
             print("❌ Operation canceled.")
     else:
-        cursor.execute("SELECT * FROM devices WHERE mac_address = ?", (mac_address,))
+        cursor.execute("SELECT * FROM devices WHERE mac_address = %s", (mac_address,))
         device = cursor.fetchone()
         if device:
-            cursor.execute("DELETE FROM devices WHERE mac_address = ?", (mac_address,))
+            cursor.execute("DELETE FROM devices WHERE mac_address = %s", (mac_address,))
             conn.commit()
             print(f"✅ Device with MAC address {mac_address} deleted.")
         else:
