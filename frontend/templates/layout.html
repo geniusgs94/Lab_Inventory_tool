@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lab Device Inventory</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Lab Device Inventory</h1>
+        <nav>
+            {% if session.get('username') %}
+                Welcome, {{ session.username }} ({{ session.role }}) |
+                <a href="{{ url_for('history') }}">History</a> |
+                <a href="{{ url_for('inventory') }}">Inventory</a> |
+                <a href="{{ url_for('add_item') }}">Add Device</a> |
+                <a href="{{ url_for('logout') }}">Logout</a>
+            {% else %}
+                <a href="{{ url_for('login') }}">Login</a>
+            {% endif %}
+        </nav>
+    </header>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <ul>
+      {% for category, message in messages %}
+        <li class="{{ category }}">{{ message }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+
+    <main>
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <footer>
+        <p>&copy; 2025 Lab Inventory System</p>
+    </footer>
+</body>
+</html>

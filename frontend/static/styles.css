@@ -1,0 +1,163 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f9;
+    margin: 0;
+    padding: 0;
+}
+
+header {
+    background-color: #003366;
+    color: #ffffff;
+    padding: 1rem;
+    text-align: center;
+}
+
+header h1 {
+    margin: 0;
+}
+
+nav {
+    margin-top: 0.5rem;
+}
+
+nav a {
+    color: #ffffff;
+    text-decoration: none;
+    margin: 0 10px;
+    font-weight: bold;
+}
+
+main {
+    padding: 20px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #ffffff;
+    box-shadow: 0 0 5px rgba(0,0,0,0.1);
+}
+
+table th, table td {
+    padding: 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+table th {
+    background-color: #f0f0f0;
+}
+
+form input, form select, form button {
+    padding: 8px;
+    width: 300px;
+    margin-bottom: 10px;
+}
+
+form button {
+    background-color: #003366;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+form button:hover {
+    background-color: #0055a5;
+}
+
+footer {
+    text-align: center;
+    padding: 1rem;
+    background-color: #eaeaea;
+    margin-top: 2rem;
+}
+
+/* Flash message styles */
+.success {
+    color: green;
+    background-color: #ddffdd;
+    padding: 10px;
+    border: 1px solid green;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.danger {
+    color: darkred;
+    background-color: #ffe5e5;
+    padding: 10px;
+    border: 1px solid darkred;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.error {
+    color: darkred;
+    background-color: #ffe5e5;
+    padding: 10px;
+    border: 1px solid darkred;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+ul {
+    margin-top: 0;
+    margin-bottom: 10px;
+    padding-left: 0;
+    list-style: none;
+}
+.search-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.search-form input[type="text"],
+.search-form select,
+.search-form button,
+.search-form .clear-button {
+    padding: 8px;
+    height: 38px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.search-form .clear-button {
+    background-color: transparent;
+    color: #003366;
+    text-decoration: underline;
+    border: none;
+    cursor: pointer;
+    padding: 0 10px;
+    height: auto;
+    align-self: center;
+}
+/* Match availability label styling with form fields */
+.availability-label {
+    font-size: 14px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+}
+.btn-request {
+    background-color: #ff9800;   /* Orange button */
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.btn-request:hover {
+    background-color: #e68900;  /* Darker orange on hover */
+    transform: scale(1.05);     /* Slight zoom effect */
+}
+
+.btn-request:active {
+    background-color: #cc7a00;  /* Even darker when clicked */
+}

@@ -1,0 +1,53 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<h2>Edit Device</h2>
+
+<form action="{{ url_for('edit_item', id=device['id']) }}" method="POST">
+
+    <!-- Device Name (readonly) -->
+    <label for="device_name">Device Name:</label>
+    <input type="text" id="device_name" name="device_name" value="{{ device['device_name'] }}" readonly>
+
+    <!-- Serial Number (readonly) -->
+    <label for="serial_number">Serial Number:</label>
+    <input type="text" id="serial_number" name="serial_number" value="{{ device['serial_number'] }}" readonly>
+
+    <!-- Model (readonly) -->
+    <label for="model">Model:</label>
+    <input type="text" id="model" name="model" value="{{ device['model'] }}" readonly>
+
+    <!-- Availability (editable) -->
+    <label for="availability">Availability:</label>
+    <select id="availability" name="availability">
+        <option value="Available" {% if device['availability'] == 'Available' %}selected{% endif %}>Available</option>
+        <option value="In Use" {% if device['availability'] == 'In Use' %}selected{% endif %}>In Use</option>
+        <option value="Under Maintenance" {% if device['availability'] == 'Under Maintenance' %}selected{% endif %}>Under Maintenance</option>
+    </select>
+
+    <!-- Reporting Manager (editable) -->
+    <label for="reporting_manager">Reporting Manager:</label>
+    <input type="text" id="reporting_manager" name="reporting_manager" value="{{ device['reporting_manager'] }}">
+
+    <!-- Team (editable) -->
+    <label for="team">Team:</label>
+    <input type="text" id="team" name="team" value="{{ device['team'] }}">
+
+    <!-- IP Address (editable) -->
+    <label for="ip_address">IP Address:</label>
+    <input type="text" id="ip_address" name="ip_address" value="{{ device['ip_address'] }}">
+
+    <!-- Location (editable) -->
+    <label for="location">Location:</label>
+    <input type="text" id="location" name="location" value="{{ device['location'] }}">
+
+    <!-- Notes (readonly) -->
+    <label for="notes">Notes:</label>
+    <textarea id="notes" name="notes" readonly>{{ device['notes'] }}</textarea>
+
+    <div style="margin-top: 15px;">
+        <button type="submit">Save Changes</button>
+        <a href="{{ url_for('inventory') }}" style="margin-left: 10px;">Cancel</a>
+    </div>
+</form>
+{% endblock %}
