@@ -1,0 +1,29 @@
+lab_inventory/
+│
+├── app/                          # Application package
+│   ├── __init__.py               # Initialize Flask app and DB
+│   ├── routes.py                 # All Flask routes
+│   ├── models.py                 # DB schema & helper functions
+│   ├── auth.py                   # (Optional) Auth logic (login, logout)
+│   ├── forms.py                  # (Optional) Flask-WTF forms
+│
+├── inventory.db                  # SQLite database (auto-generated)
+│
+├── init_db.py                    # Script to initialize/reset DB
+│
+├── static/
+│   └── styles.css                # CSS styles
+│
+├── templates/
+│   ├── layout.html               # Base layout
+│   ├── login.html                # Login page
+│   ├── index.html                # Inventory list
+│   ├── add_item.html             # Add item form
+│   ├── edit_item.html            # Edit item form
+│   └── history.html              # (Optional) Item update history
+│
+├── app.py                        # Entry point (can be minimal)
+│
+├── requirements.txt              # Python dependencies
+│
+└── README.md                     # Project overview & setup instructions

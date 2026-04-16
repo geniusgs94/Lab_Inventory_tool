@@ -8,15 +8,24 @@
         type="text"
         name="search"
         placeholder="Search all fields"
+<<<<<<< HEAD
         value="{{ request.query_params.get('search', '') }}"
+=======
+        value="{{ request.args.get('search', '') }}"
+>>>>>>> 35561528739089a969ee2cab51579bd5ae3bb01a
     >
     <button type="submit">Search</button>
 
     <label for="availability" class="availability-label">Availability:</label>
     <select name="availability" id="availability" onchange="this.form.submit()">
         <option value="">All</option>
+<<<<<<< HEAD
         <option value="Available" {% if request.query_params.get('availability') == 'Available' %}selected{% endif %}>Available</option>
         <option value="In Use" {% if request.query_params.get('availability') == 'In Use' %}selected{% endif %}>In Use</option>
+=======
+        <option value="Available" {% if request.args.get('availability') == 'Available' %}selected{% endif %}>Available</option>
+        <option value="In Use" {% if request.args.get('availability') == 'In Use' %}selected{% endif %}>In Use</option>
+>>>>>>> 35561528739089a969ee2cab51579bd5ae3bb01a
     </select>
 
     <a href="{{ url_for('inventory') }}" class="clear-button">Clear</a>

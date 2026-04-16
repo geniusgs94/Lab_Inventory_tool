@@ -1,5 +1,8 @@
 # Virtual environment
+<<<<<<< HEAD
 .venv/
+=======
+>>>>>>> 35561528739089a969ee2cab51579bd5ae3bb01a
 venv/
 env/
 
@@ -28,6 +31,7 @@ Thumbs.db
 .env
 
 #IDE config files
+<<<<<<< HEAD
 .idea/
 
 
@@ -35,3 +39,6 @@ Thumbs.db
 Fastapiconversion.txt
 PostgresMigration.txt
 RefactoringFolderStructure.txt
+=======
+.idea/
+>>>>>>> 35561528739089a969ee2cab51579bd5ae3bb01a
