@@ -1,0 +1,71 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="history-container">
+    <h2>Notifications</h2>
+
+    {% if notifications %}
+    <table>
+        <thead>
+            <tr>
+                <th>Message</th>
+                <th>Device</th>
+                <th>Received</th>
+                <th>Requested Until</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for n in notifications %}
+            <tr {% if not n.is_read %}style="font-weight:bold; background-color:#fffbe6;"{% endif %}>
+                <td>{{ n.message }}</td>
+                <td>{{ n.related_mac_address or '—' }}</td>
+                <td>{{ n.created_at.strftime('%b %-d, %Y') if n.created_at else '—' }}</td>
+                <td>{{ n.requested_lease_date.strftime('%b %-d, %Y') if n.requested_lease_date else '—' }}</td>
+                <td>
+                    {% if n.request_type == 'renewal' %}
+                        <span style="color:#0c5460; background-color:#d1ecf1; padding:2px 8px; border-radius:4px; font-size:12px;">Renewal</span>
+                    {% elif n.request_type == 'request' %}
+                        <span style="color:#383d41; background-color:#e2e3e5; padding:2px 8px; border-radius:4px; font-size:12px;">Request</span>
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td>
+                    {% if n.request_id %}
+                        {% if n.request_status == 'pending' %}
+                            <span style="color:#856404; background-color:#fff3cd; padding:2px 8px; border-radius:4px; font-size:12px;">Pending</span>
+                        {% elif n.request_status == 'accepted' %}
+                            <span style="color:#155724; background-color:#d4edda; padding:2px 8px; border-radius:4px; font-size:12px;">Accepted</span>
+                        {% elif n.request_status == 'declined' %}
+                            <span style="color:#721c24; background-color:#f8d7da; padding:2px 8px; border-radius:4px; font-size:12px;">Declined</span>
+                        {% elif n.request_status == 'cancelled' %}
+                            <span style="color:#555; background-color:#e2e3e5; padding:2px 8px; border-radius:4px; font-size:12px;">Cancelled</span>
+                        {% endif %}
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+                <td>
+                    {% if n.request_id and n.request_status == 'pending' %}
+                        <form action="{{ url_for('accept_request', request_id=n.request_id) }}" method="post" style="display:inline;">
+                            <button type="submit" style="background-color:#28a745; color:white; border:none; padding:5px 12px; border-radius:4px; cursor:pointer; margin-right:6px;">Accept</button>
+                        </form>
+                        <form action="{{ url_for('decline_request', request_id=n.request_id) }}" method="post" style="display:inline;">
+                            <button type="submit" style="background-color:#dc3545; color:white; border:none; padding:5px 12px; border-radius:4px; cursor:pointer;">Decline</button>
+                        </form>
+                    {% else %}
+                        —
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No notifications yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

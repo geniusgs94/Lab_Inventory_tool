@@ -3,11 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Lab Device Inventory</title>
-<<<<<<< HEAD
     <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
-=======
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
->>>>>>> 35561528739089a969ee2cab51579bd5ae3bb01a
 </head>
 <body>
     <header>
@@ -18,9 +14,8 @@
                 <a href="{{ url_for('history') }}">History</a> |
                 <a href="{{ url_for('inventory') }}">Inventory</a> |
                 <a href="{{ url_for('add_item') }}">Add Device</a> |
+                <a href="{{ url_for('notifications') }}">Notifications{% if unread_notification_count > 0 %}<span class="badge">{{ unread_notification_count }}</span>{% endif %}</a> |
                 <a href="{{ url_for('logout') }}">Logout</a>
-            {% else %}
-                <a href="{{ url_for('login') }}">Login</a>
             {% endif %}
         </nav>
     </header>
@@ -42,5 +37,8 @@
     <footer>
         <p>&copy; 2025 Lab Inventory System</p>
     </footer>
+    <script src="{{ url_for('static', path='autocomplete.js') }}"></script>
+    <script src="{{ url_for('static', path='datepicker.js') }}"></script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

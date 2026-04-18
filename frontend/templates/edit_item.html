@@ -1,53 +1,87 @@
 {% extends 'layout.html' %}
 
 {% block content %}
-<h2>Edit Device</h2>
+<div class="edit-form-card">
+    <h2>Edit Device</h2>
 
-<form action="{{ url_for('edit_item', id=device['id']) }}" method="POST">
+    <form action="{{ url_for('edit_item', id=device['id']) }}" method="POST">
+        <div class="form-grid">
 
-    <!-- Device Name (readonly) -->
-    <label for="device_name">Device Name:</label>
-    <input type="text" id="device_name" name="device_name" value="{{ device['device_name'] }}" readonly>
+            <div class="form-field">
+                <label for="mac_address">MAC Address</label>
+                <input type="text" id="mac_address" name="mac_address" value="{{ device['mac_address'] }}"{% if session.role != 'admin' %} readonly{% endif %}>
+            </div>
 
-    <!-- Serial Number (readonly) -->
-    <label for="serial_number">Serial Number:</label>
-    <input type="text" id="serial_number" name="serial_number" value="{{ device['serial_number'] }}" readonly>
+            <div class="form-field">
+                <label for="device_model">Device Model</label>
+                <input type="text" id="device_model" name="device_model" value="{{ device['device_model'] }}"{% if session.role != 'admin' %} readonly{% endif %}>
+            </div>
 
-    <!-- Model (readonly) -->
-    <label for="model">Model:</label>
-    <input type="text" id="model" name="model" value="{{ device['model'] }}" readonly>
+            <div class="form-field">
+                <label for="owner">Owner</label>
+                <input type="text" id="owner" name="owner" value="{{ device['owner'] }}"{% if session.role != 'admin' %} readonly{% endif %}>
+            </div>
 
-    <!-- Availability (editable) -->
-    <label for="availability">Availability:</label>
-    <select id="availability" name="availability">
-        <option value="Available" {% if device['availability'] == 'Available' %}selected{% endif %}>Available</option>
-        <option value="In Use" {% if device['availability'] == 'In Use' %}selected{% endif %}>In Use</option>
-        <option value="Under Maintenance" {% if device['availability'] == 'Under Maintenance' %}selected{% endif %}>Under Maintenance</option>
-    </select>
+            <div class="form-field">
+                <label for="availability">Availability</label>
+                <select id="availability" name="availability">
+                    <option value="Available" {% if device['availability'] == 'Available' %}selected{% endif %}>Available</option>
+                    <option value="In Use" {% if device['availability'] == 'In Use' %}selected{% endif %}>In Use</option>
+                </select>
+            </div>
 
-    <!-- Reporting Manager (editable) -->
-    <label for="reporting_manager">Reporting Manager:</label>
-    <input type="text" id="reporting_manager" name="reporting_manager" value="{{ device['reporting_manager'] }}">
+            <div class="form-field">
+                <label for="reporting_manager">Reporting Manager</label>
+                <input type="text" id="reporting_manager" name="reporting_manager" value="{{ device['reporting_manager'] }}">
+            </div>
 
-    <!-- Team (editable) -->
-    <label for="team">Team:</label>
-    <input type="text" id="team" name="team" value="{{ device['team'] }}">
+            <div class="form-field">
+                <label for="team">Team</label>
+                <input type="text" id="team" name="team" value="{{ device['team'] }}">
+            </div>
 
-    <!-- IP Address (editable) -->
-    <label for="ip_address">IP Address:</label>
-    <input type="text" id="ip_address" name="ip_address" value="{{ device['ip_address'] }}">
+            <div class="form-field">
+                <label for="ip_address">IP Address</label>
+                <input type="text" id="ip_address" name="ip_address" value="{{ device['ip_address'] }}">
+            </div>
 
-    <!-- Location (editable) -->
-    <label for="location">Location:</label>
-    <input type="text" id="location" name="location" value="{{ device['location'] }}">
+            <div class="form-field">
+                <label for="location">Location</label>
+                <input type="text" id="location" name="location" value="{{ device['location'] }}">
+            </div>
 
-    <!-- Notes (readonly) -->
-    <label for="notes">Notes:</label>
-    <textarea id="notes" name="notes" readonly>{{ device['notes'] }}</textarea>
+            <div class="form-field">
+                <label for="lease">Lease</label>
+                <input type="text" id="lease" name="lease" value="{{ device['lease'] }}"{% if session.role != 'admin' %} readonly{% endif %}>
+            </div>
 
-    <div style="margin-top: 15px;">
-        <button type="submit">Save Changes</button>
-        <a href="{{ url_for('inventory') }}" style="margin-left: 10px;">Cancel</a>
-    </div>
-</form>
+            <div class="form-field">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" value="{{ device['decrypted_password'] }}" autocomplete="new-password">
+            </div>
+
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Save Changes</button>
+            <a href="{{ url_for('inventory') }}" class="btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/api/autocomplete-options')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            initAutocomplete(document.getElementById('owner'), data.owners || []);
+            initAutocomplete(document.getElementById('reporting_manager'), data.reporting_managers || []);
+            initAutocomplete(document.getElementById('device_model'), data.device_models || []);
+            initAutocomplete(document.getElementById('team'), data.teams || []);
+        })
+        .catch(function() {});
+});
+</script>
 {% endblock %}

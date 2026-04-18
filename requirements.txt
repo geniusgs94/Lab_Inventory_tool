@@ -1,14 +1,10 @@
-<<<<<<< HEAD
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 python-multipart==0.0.9
 PyJWT==2.9.0
 itsdangerous==2.2.0
 Jinja2==3.1.4
-=======
-Flask==3.0.0
-gunicorn==21.2.0
->>>>>>> 35561528739089a969ee2cab51579bd5ae3bb01a
 Werkzeug==3.0.1
 psycopg2-binary==2.9.9
 python-dotenv==1.0.1
+cryptography==42.0.8

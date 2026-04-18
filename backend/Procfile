@@ -1,5 +1,1 @@
-<<<<<<< HEAD
 web: uvicorn main:app --host 0.0.0.0 --port $PORT
-=======
-web: gunicorn app:app
->>>>>>> 35561528739089a969ee2cab51579bd5ae3bb01a

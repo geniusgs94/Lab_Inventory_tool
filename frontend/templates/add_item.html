@@ -1,39 +1,87 @@
 {% extends 'layout.html' %}
 
 {% block content %}
-<h2>Add New Device</h2>
+<div class="edit-form-card">
+    <h2>Add New Device</h2>
 
-<form method="POST" action="{{ url_for('add_item') }}">
-    <label for="mac_address">MAC Address:</label><br>
-    <input type="text" id="mac_address" name="mac_address" required><br><br>
+    <form method="POST" action="{{ url_for('add_item') }}">
+        <div class="form-grid">
 
-    <label for="device_model">Device Model:</label><br>
-    <input type="text" id="device_model" name="device_model" required><br><br>
+            <div class="form-field">
+                <label for="mac_address">MAC Address</label>
+                <input type="text" id="mac_address" name="mac_address" required>
+            </div>
 
-    <label for="owner">Owner:</label><br>
-    <input type="text" id="owner" name="owner" required><br><br>
+            <div class="form-field">
+                <label for="device_model">Device Model</label>
+                <input type="text" id="device_model" name="device_model" required>
+            </div>
 
-    <label for="availability">Availability:</label><br>
-    <select id="availability" name="availability" required>
-        <option value="Available">Available</option>
-        <option value="In Use">In Use</option>
-    </select><br><br>
+            <div class="form-field">
+                <label for="owner">Owner</label>
+                <input type="text" id="owner" name="owner" required>
+            </div>
 
-    <label for="reporting_manager">Reporting Manager:</label><br>
-    <input type="text" id="reporting_manager" name="reporting_manager"><br><br>
+            <div class="form-field">
+                <label for="availability">Availability</label>
+                <select id="availability" name="availability" required>
+                    <option value="Available">Available</option>
+                    <option value="In Use">In Use</option>
+                </select>
+            </div>
 
-    <label for="team">Team:</label><br>
-    <input type="text" id="team" name="team"><br><br>
+            <div class="form-field">
+                <label for="reporting_manager">Reporting Manager</label>
+                <input type="text" id="reporting_manager" name="reporting_manager">
+            </div>
 
-    <label for="ip_address">IP Address:</label><br>
-    <input type="text" id="ip_address" name="ip_address"><br><br>
+            <div class="form-field">
+                <label for="team">Team</label>
+                <input type="text" id="team" name="team">
+            </div>
 
-    <label for="location">Location:</label><br>
-    <input type="text" id="location" name="location"><br><br>
+            <div class="form-field">
+                <label for="ip_address">IP Address</label>
+                <input type="text" id="ip_address" name="ip_address">
+            </div>
 
-    <label for="lease">Lease:</label><br>
-    <input type="text" id="lease" name="lease"><br><br>
+            <div class="form-field">
+                <label for="location">Location</label>
+                <input type="text" id="location" name="location">
+            </div>
 
-    <button type="submit">Add Device</button>
-</form>
+            <div class="form-field">
+                <label for="lease">Lease</label>
+                <input type="text" id="lease" name="lease">
+            </div>
+
+            <div class="form-field">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" autocomplete="new-password">
+            </div>
+
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">Add Device</button>
+            <a href="{{ url_for('inventory') }}" class="btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/api/autocomplete-options')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            initAutocomplete(document.getElementById('owner'), data.owners || []);
+            initAutocomplete(document.getElementById('reporting_manager'), data.reporting_managers || []);
+            initAutocomplete(document.getElementById('device_model'), data.device_models || []);
+            initAutocomplete(document.getElementById('team'), data.teams || []);
+        })
+        .catch(function() {});
+});
+</script>
 {% endblock %}

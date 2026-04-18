@@ -55,14 +55,14 @@ def _pop_flashes(request: Request, with_categories: bool = False):
     return [f["message"] for f in raw]
 
 
-def render(template_name: str, request: Request, context: Optional[dict] = None):
-    """
-    Render a Jinja2 template with JWT user info and flash messages pre-injected.
+def _require_login(request: Request):
+    user = get_current_user(request)
+    if not user:
+        flash(request, "Session expired or you are not logged in.", "danger")
+    return user
 
-    Injects into every template context:
-      - session   : dict of JWT payload (username, role, user_id) or {} if not logged in
-      - get_flashed_messages : mimics Flask's built-in, pops flashes from session
-    """
+
+def render(template_name: str, request: Request, context: Optional[dict] = None):
     ctx = context or {}
     user = get_current_user(request)
     ctx["request"] = request
@@ -70,4 +70,9 @@ def render(template_name: str, request: Request, context: Optional[dict] = None)
     ctx["get_flashed_messages"] = lambda **kwargs: _pop_flashes(
         request, with_categories=kwargs.get("with_categories", False)
     )
+    if user:
+        from services.db import get_unread_notification_count
+        ctx["unread_notification_count"] = get_unread_notification_count(user["username"])
+    else:
+        ctx["unread_notification_count"] = 0
     return templates.TemplateResponse(template_name, ctx)

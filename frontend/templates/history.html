@@ -1,32 +1,52 @@
 {% extends 'layout.html' %}
 
 {% block content %}
-<h2>Change History</h2>
+<div class="history-container">
+    <h2>Device Edit History</h2>
 
-{% if logs %}
-<table border="1">
-    <thead>
-        <tr>
-            <th>User</th>
-            <th>Action</th>
-            <th>Item</th>
-            <th>Details</th>
-            <th>Timestamp</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for log in logs %}
-        <tr>
-            <td>{{ log.username }}</td>
-            <td>{{ log.action }}</td>
-            <td>{{ log.item_name }}</td>
-            <td><pre>{{ log.details | tojson(indent=2) }}</pre></td>
-            <td>{{ log.timestamp }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>No change logs found.</p>
-{% endif %}
+    {% if logs %}
+    <table>
+        <thead>
+            <tr>
+                <th>MAC Address</th>
+                <th>Field Changed</th>
+                <th>Old Value</th>
+                <th>New Value</th>
+                <th>Changed By</th>
+                <th>Changed At</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.mac_address }}</td>
+                <td>{{ log.field_name }}</td>
+                <td>{{ log.old_value if log.old_value else '—' }}</td>
+                <td>{{ log.new_value if log.new_value else '—' }}</td>
+                <td>{{ log.changed_by }}</td>
+                <td>{{ log.changed_at }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="{{ url_for('history') }}?page={{ page - 1 }}" class="btn-secondary">Previous</a>
+        {% else %}
+        <button class="btn-secondary" disabled>Previous</button>
+        {% endif %}
+
+        <span>Page {{ page }} of {{ total_pages }}</span>
+
+        {% if page < total_pages %}
+        <a href="{{ url_for('history') }}?page={{ page + 1 }}" class="btn-secondary">Next</a>
+        {% else %}
+        <button class="btn-secondary" disabled>Next</button>
+        {% endif %}
+    </div>
+    {% else %}
+    <p>No edit history found.</p>
+    {% endif %}
+</div>
 {% endblock %}

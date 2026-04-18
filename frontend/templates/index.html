@@ -8,24 +8,15 @@
         type="text"
         name="search"
         placeholder="Search all fields"
-<<<<<<< HEAD
         value="{{ request.query_params.get('search', '') }}"
-=======
-        value="{{ request.args.get('search', '') }}"
->>>>>>> 35561528739089a969ee2cab51579bd5ae3bb01a
     >
     <button type="submit">Search</button>
 
     <label for="availability" class="availability-label">Availability:</label>
     <select name="availability" id="availability" onchange="this.form.submit()">
         <option value="">All</option>
-<<<<<<< HEAD
         <option value="Available" {% if request.query_params.get('availability') == 'Available' %}selected{% endif %}>Available</option>
         <option value="In Use" {% if request.query_params.get('availability') == 'In Use' %}selected{% endif %}>In Use</option>
-=======
-        <option value="Available" {% if request.args.get('availability') == 'Available' %}selected{% endif %}>Available</option>
-        <option value="In Use" {% if request.args.get('availability') == 'In Use' %}selected{% endif %}>In Use</option>
->>>>>>> 35561528739089a969ee2cab51579bd5ae3bb01a
     </select>
 
     <a href="{{ url_for('inventory') }}" class="clear-button">Clear</a>
@@ -43,6 +34,7 @@
         <th>IP Address</th>
         <th>Location</th>
         <th>Lease</th>
+        <th>Password</th>
         <th>Edit</th>
         <th>Action</th>
     </tr>
@@ -58,39 +50,157 @@
         <td>{{ device.team }}</td>
         <td>{{ device.ip_address }}</td>
         <td>{{ device.location }}</td>
-        <td>{{ device.lease }}</td>
+
+        <!-- Lease column -->
+        <td>
+            {% if device.leasee_username %}
+                {{ device.leasee_username }} (expires: {{ device.lease_expiry.strftime('%b %-d, %Y') if device.lease_expiry else 'N/A' }})
+            {% else %}
+                —
+            {% endif %}
+        </td>
+
+        <!-- Password column -->
+        <td class="pwd-cell">
+            <span id="pwd-display-{{ device.id }}">
+                {%- if device.password -%}••••••••{%- else -%}—{%- endif -%}
+            </span>
+            {% if device.password %}
+            <button type="button" class="btn-show-pwd" onclick="togglePassword({{ device.id }}, this)">Show</button>
+            {% endif %}
+        </td>
 
         <!-- Edit column -->
         <td>
-            <a href="{{ url_for('edit_item', id=device.id) }}" class="btn btn-sm btn-warning" style="margin-bottom:5px; display:inline-block;">Edit</a>
+            {% if session.role == 'admin' or (device.owner or '')|lower|trim == session.username|lower|trim %}
+                <a href="{{ url_for('edit_item', id=device.id) }}" class="btn btn-sm btn-warning" style="margin-bottom:5px; display:inline-block;">Edit</a>
+            {% endif %}
+            {% if session.role == 'admin' %}
+                <a href="{{ url_for('delete_item', id=device.id) }}"
+                   class="btn btn-sm btn-danger"
+                   style="display:inline-block;"
+                   onclick="return confirm('Delete device {{ device.mac_address }}? This cannot be undone.');">Delete</a>
+            {% endif %}
         </td>
 
         <!-- Action column -->
         <td>
-            {% if device.availability == 'Available' %}
-                <form action="{{ url_for('reserve_device', id=device.id) }}" method="post" style="display:inline;">
-                    <button type="submit">Reserve</button>
+            {% set owner = device.owner or '' %}
+            {% set is_owner = owner|lower|trim == session.username|lower|trim %}
+            {% set no_owner = not owner or owner|trim == '' %}
+            {% set leasee = device.leasee_username or '' %}
+            {% set is_leasee = leasee|lower|trim == session.username|lower|trim and leasee|trim != '' %}
+            {% set has_leasee = leasee|trim != '' %}
+            {% set lease_expiry_str = device.lease_expiry.strftime('%Y-%m-%d') if device.lease_expiry else '' %}
+
+            {% if device.availability == 'Available' and no_owner %}
+                {# Free device — Claim #}
+                {% if device.mac_address not in pending_macs %}
+                    <form action="{{ url_for('claim_device', id=device.id) }}" method="post" style="display:inline;">
+                        <button type="submit" style="background-color:#28a745; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">Claim</button>
+                    </form>
+                {% endif %}
+
+            {% elif device.availability == 'Available' and is_owner %}
+                {# Owner claimed but not yet using #}
+                <form action="{{ url_for('use_device', id=device.id) }}" method="post" style="display:inline;">
+                    <button type="submit" style="background-color:#003366; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">Use</button>
                 </form>
 
-            {% elif device.availability == 'In Use' and device.owner|lower|trim == session.username|lower|trim %}
-                <form action="{{ url_for('release_device', id=device.id) }}" method="post" style="display:inline;">
-                    <button type="submit">Release</button>
+            {% elif device.availability == 'In Use' and is_owner %}
+                {# Owner — Release (warn if active leasee) #}
+                <form action="{{ url_for('release_device', id=device.id) }}" method="post" style="display:inline;"
+                      {% if has_leasee %}onsubmit="return confirm('Warning: this will also end the active lease by {{ leasee }}. Continue?');"{% endif %}>
+                    <button type="submit" style="background-color:#6c757d; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">Release</button>
                 </form>
 
-            {% elif device.availability == 'In Use' and device.owner|lower|trim != session.username|lower|trim %}
-                <form action="{{ url_for('request_device', id=device.id) }}" method="post" style="display:inline;">
-                    <button type="submit" style="background-color:#007bff; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">
-                        Request
-                    </button>
-                </form>
+            {% elif device.availability == 'In Use' and is_leasee %}
+                {# Current leasee — Renew Lease #}
+                {% if device.mac_address in my_pending_renewal_macs %}
+                    <button type="button" disabled style="background-color:#adb5bd; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:not-allowed;">Renewal Pending</button>
+                {% else %}
+                    <form action="{{ url_for('renew_lease', id=device.id) }}" method="post" style="display:inline;">
+                        <input type="text" name="requested_lease_date"
+                               class="renew-date-input"
+                               data-lease-expiry="{{ lease_expiry_str }}"
+                               required readonly
+                               placeholder="Select date"
+                               style="margin-right:4px; padding:3px; border-radius:4px; border:1px solid #ccc; width:110px; cursor:pointer;">
+                        <button type="submit" style="background-color:#17a2b8; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">Renew Lease</button>
+                    </form>
+                {% endif %}
+
+            {% elif device.availability == 'In Use' and not is_owner and not is_leasee %}
+                {# Non-owner non-leasee — Request with date picker #}
+                {% if device.mac_address in my_pending_macs %}
+                    <button type="button" disabled style="background-color:#adb5bd; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:not-allowed;">Requested</button>
+                {% else %}
+                    <form action="{{ url_for('request_device', id=device.id) }}" method="post" style="display:inline;">
+                        <input type="text" name="requested_lease_date"
+                               class="lease-date-input"
+                               required readonly
+                               placeholder="Select date"
+                               style="margin-right:4px; padding:3px; border-radius:4px; border:1px solid #ccc; width:110px; cursor:pointer;">
+                        <button type="submit" class="btn-request" style="background-color:#fd7e14; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">Request</button>
+                    </form>
+                {% endif %}
             {% endif %}
         </td>
     </tr>
     {% else %}
     <tr>
-        <td colspan="11">No devices found.</td>
+        <td colspan="12">No devices found.</td>
     </tr>
     {% endfor %}
 </tbody>
 </table>
+
+<script>
+async function togglePassword(deviceId, btn) {
+    const display = document.getElementById('pwd-display-' + deviceId);
+    if (btn.textContent === 'Hide') {
+        display.textContent = '••••••••';
+        btn.textContent = 'Show';
+        return;
+    }
+    try {
+        const resp = await fetch('/reveal-password/' + deviceId);
+        const data = await resp.json();
+        if (resp.ok) {
+            display.textContent = data.password || '(empty)';
+            btn.textContent = 'Hide';
+        } else {
+            display.textContent = data.error || 'Access denied';
+        }
+    } catch (e) {
+        display.textContent = 'Error';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    var tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    var maxRequest = new Date(today);
+    maxRequest.setDate(today.getDate() + 7);
+
+    document.querySelectorAll('.lease-date-input').forEach(function (input) {
+        initDatePicker(input, { minDate: tomorrow, maxDate: maxRequest });
+    });
+
+    document.querySelectorAll('.renew-date-input').forEach(function (input) {
+        var expiryStr = input.getAttribute('data-lease-expiry');
+        if (expiryStr) {
+            var expiry = new Date(expiryStr + 'T00:00:00');
+            var minRenew = new Date(expiry);
+            minRenew.setDate(expiry.getDate() + 1);
+            var maxRenew = new Date(expiry);
+            maxRenew.setDate(expiry.getDate() + 7);
+            initDatePicker(input, { minDate: minRenew, maxDate: maxRenew });
+        }
+    });
+});
+</script>
 {% endblock %}

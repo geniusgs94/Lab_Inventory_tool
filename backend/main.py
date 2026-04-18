@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from routers import auth, devices, history
+from routers import auth, devices, history, notifications
 
 load_dotenv()
 
@@ -29,3 +29,4 @@ app.mount(
 app.include_router(auth.router)
 app.include_router(devices.router)
 app.include_router(history.router)
+app.include_router(notifications.router)
