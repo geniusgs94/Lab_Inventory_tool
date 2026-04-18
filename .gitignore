@@ -1,17 +1,22 @@
-# Virtual environment
-<<<<<<< HEAD
-.venv/
-=======
->>>>>>> 35561528739089a969ee2cab51579bd5ae3bb01a
+# Virtual environments
 venv/
+.venv/
 env/
+ENV/
 
-# Python cache
+# Python cache and tooling
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
 # Environment variables
 .env
+.env.*
+!.env.example
 
 # OS files
 .DS_Store
@@ -27,18 +32,20 @@ Thumbs.db
 # Logs
 *.log
 
-#Credentials
-.env
-
-#IDE config files
-<<<<<<< HEAD
-.idea/
-
-
-#claudefiles
-Fastapiconversion.txt
+# Local working notes
 PostgresMigration.txt
 RefactoringFolderStructure.txt
-=======
-.idea/
->>>>>>> 35561528739089a969ee2cab51579bd5ae3bb01a
+Test.txt
+autofill.txt
+actions.txt
+leasefunctionality.txt
+datecalendar.txt
+documentation.txt
+editdevicepage.txt
+fastapi.txt
+historyimplementation.txt
+loginpage.txt
+passwordimplementation.txt
+sqlconnectionpool.txt
+userVSadmin.txt
+
