@@ -92,30 +92,6 @@ def init_pool(minconn: int = 2, maxconn: int = 10) -> None:
         _pool = psycopg2.pool.ThreadedConnectionPool(minconn, maxconn, **get_database_config())
 
 
-# def ensure_schema() -> None:
-    # if _pool is None:
-        # raise RuntimeError("Database pool has not been initialized.")
-
-    # conn = get_db_connection()
-    # try:
-        # cur = conn.cursor()
-
-        #Older databases can miss columns added after the initial PostgreSQL migration.
-        # cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS password TEXT DEFAULT ''")
-        # cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS leasee_username TEXT")
-        # cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS lease_expiry TIMESTAMP")
-        # cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS lease_warning_sent BOOLEAN DEFAULT FALSE")
-        # conn.commit()
-
-        # try:
-            # cur.execute("ALTER TABLE devices ALTER COLUMN owner DROP NOT NULL")
-            # conn.commit()
-        # except Exception:
-            # conn.rollback()
-    # finally:
-        # return_db_connection(conn)
-
-
 def close_pool() -> None:
     global _pool
     if _pool is not None:

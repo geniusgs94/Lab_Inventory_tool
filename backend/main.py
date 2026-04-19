@@ -42,10 +42,7 @@ _scheduler = BackgroundScheduler()
 
 @app.on_event("startup")
 def start_scheduler():
-    from init_db import init_db
-    init_db()
     init_pool(minconn=2, maxconn=10)
-    #ensure_schema()
     from services.backup import create_backup
     _scheduler.add_job(
         create_backup,
