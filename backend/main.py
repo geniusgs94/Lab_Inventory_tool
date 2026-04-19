@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from routers import auth, backup, devices, history, notifications, users
-from services.db import close_pool, ensure_schema, init_pool
+from services.db import close_pool, init_pool
 
 load_dotenv()
 
