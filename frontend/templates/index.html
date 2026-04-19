@@ -54,7 +54,7 @@
         <!-- Lease column -->
         <td>
             {% if device.leasee_username %}
-                {{ device.leasee_username }} (expires: {{ device.lease_expiry.strftime('%b %-d, %Y') if device.lease_expiry else 'N/A' }})
+                {{ device.leasee_username }} (expires: {{ device.lease_expiry.strftime('%b %d, %Y') if device.lease_expiry else 'N/A' }})
             {% else %}
                 —
             {% endif %}

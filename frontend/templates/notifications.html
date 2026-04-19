@@ -22,8 +22,8 @@
             <tr {% if not n.is_read %}style="font-weight:bold; background-color:#fffbe6;"{% endif %}>
                 <td>{{ n.message }}</td>
                 <td>{{ n.related_mac_address or '—' }}</td>
-                <td>{{ n.created_at.strftime('%b %-d, %Y') if n.created_at else '—' }}</td>
-                <td>{{ n.requested_lease_date.strftime('%b %-d, %Y') if n.requested_lease_date else '—' }}</td>
+                <td>{{ n.created_at.strftime('%b %d, %Y') if n.created_at else '—' }}</td>
+                <td>{{ n.requested_lease_date.strftime('%b %d, %Y') if n.requested_lease_date else '—' }}</td>
                 <td>
                     {% if n.request_type == 'renewal' %}
                         <span style="color:#0c5460; background-color:#d1ecf1; padding:2px 8px; border-radius:4px; font-size:12px;">Renewal</span>

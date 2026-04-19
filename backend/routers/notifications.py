@@ -100,7 +100,7 @@ def accept_request(request_id: int, request: Request):
             "new_expiry": str(lease_date),
         })
 
-        expiry_str = lease_date.strftime("%b %-d, %Y") if lease_date else "N/A"
+        expiry_str = lease_date.strftime("%b %d, %Y") if lease_date else "N/A"
         create_notification(
             recipient_username=requester,
             message=f"Your lease renewal for device {mac} has been approved until {expiry_str}.",
@@ -143,7 +143,7 @@ def accept_request(request_id: int, request: Request):
                 related_mac_address=mac,
             )
 
-        expiry_str = lease_date.strftime("%b %-d, %Y") if lease_date else "N/A"
+        expiry_str = lease_date.strftime("%b %d, %Y") if lease_date else "N/A"
         create_notification(
             recipient_username=requester,
             message=f"Your request for device {mac} has been approved. Lease until {expiry_str}.",
