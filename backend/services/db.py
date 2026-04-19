@@ -100,7 +100,7 @@ def init_pool(minconn: int = 2, maxconn: int = 10) -> None:
     # try:
         # cur = conn.cursor()
 
-        Older databases can miss columns added after the initial PostgreSQL migration.
+        #Older databases can miss columns added after the initial PostgreSQL migration.
         # cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS password TEXT DEFAULT ''")
         # cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS leasee_username TEXT")
         # cur.execute("ALTER TABLE devices ADD COLUMN IF NOT EXISTS lease_expiry TIMESTAMP")
