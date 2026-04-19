@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
+from psycopg2.extras import RealDictCursor
 from werkzeug.security import check_password_hash
 
 from dependencies import create_access_token, flash, get_current_user, render
-from services.db import get_db_connection
+from services.db import get_db_connection, return_db_connection
 
 router = APIRouter()
 
@@ -30,10 +31,10 @@ def login_post(
     username = username.lower()
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM users WHERE username = %s", (username,))
     user = cur.fetchone()
-    conn.close()
+    return_db_connection(conn)
 
     if user and check_password_hash(user["password"], password):
         token = create_access_token({

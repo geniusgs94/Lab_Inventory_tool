@@ -3,35 +3,41 @@
 Thumbs.db
 .idea/
 
-# Python environments and caches
-.venv/
-venv/
-env/
-ENV/
+# Python caches / tooling
 __pycache__/
 *.py[cod]
+*.pyo
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
 htmlcov/
 
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+backend/.venv/
+
 # Local environment files
 .env
 backend/.env
 
-# Local databases and generated backups
+# Local databases and backups
 *.db
 backend/backups/*.sql
 
-# Project-local notes and scratch files
+# Project-local notes / scratch files
 actions.txt
 autofill.txt
+connectionpooling.txt
 datecalendar.txt
 documentation.txt
 editdevicepage.txt
 fastapi.txt
 historyimplementation.txt
+lastconversation.txt
 leasefunctionality.txt
 loginpage.txt
 passwordimplementation.txt
@@ -41,7 +47,6 @@ sqlconnectionpool.txt
 Test.txt
 userVSadmin.txt
 usermanagement.txt
-
-backend/actions.txt
-backend/databasebackup.txt
-backend/leasefunctionality.txt
+actions.txt
+databasebackup.txt
+leasefunctionality.txt

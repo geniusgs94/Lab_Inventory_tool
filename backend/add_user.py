@@ -10,7 +10,7 @@ new_username = input("Enter new username: ").lower()
 new_password = input("Enter new password: ")
 new_role = input("Enter role (admin/user): ").strip().lower()
 # Hash the password
-hashed_password = generate_password_hash(new_password)
+hashed_password = generate_password_hash(new_password, method="pbkdf2:sha256")
 
 # Connect to the database
 conn = psycopg2.connect(os.environ.get('DATABASE_URL'))

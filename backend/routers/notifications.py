@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse
+from psycopg2.extras import RealDictCursor
 
 from dependencies import flash, render, _require_login
-from services.db import create_notification, get_db_connection, log_change, log_device_edit
+from services.db import create_notification, get_db_connection, log_change, log_device_edit, return_db_connection
 
 router = APIRouter()
 
@@ -14,7 +15,7 @@ def notifications_page(request: Request):
         return RedirectResponse(url="/login", status_code=302)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute(
         """
         SELECT n.id, n.message, n.related_mac_address, n.request_id, n.is_read, n.created_at,
@@ -33,7 +34,7 @@ def notifications_page(request: Request):
         (user["username"],)
     )
     conn.commit()
-    conn.close()
+    return_db_connection(conn)
 
     return render("notifications.html", request, {"notifications": notifications})
 
@@ -45,18 +46,18 @@ def accept_request(request_id: int, request: Request):
         return RedirectResponse(url="/login", status_code=302)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
     cur.execute("SELECT * FROM device_requests WHERE id = %s", (request_id,))
     req = cur.fetchone()
 
     if not req:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Request not found.", "danger")
         return RedirectResponse(url="/notifications", status_code=303)
 
     if req["request_status"] != "pending":
-        conn.close()
+        return_db_connection(conn)
         flash(request, "This request is no longer pending.", "info")
         return RedirectResponse(url="/notifications", status_code=303)
 
@@ -64,13 +65,13 @@ def accept_request(request_id: int, request: Request):
     device = cur.fetchone()
 
     if not device:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Device not found.", "danger")
         return RedirectResponse(url="/notifications", status_code=303)
 
     owner = device["owner"] or ""
     if owner.strip().lower() != user["username"].lower():
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Access denied. You are not the owner of this device.", "danger")
         return RedirectResponse(url="/notifications", status_code=303)
 
@@ -151,7 +152,7 @@ def accept_request(request_id: int, request: Request):
         )
         flash(request, f"Request accepted. {requester} is now leasing {mac} until {expiry_str}.", "success")
 
-    conn.close()
+    return_db_connection(conn)
     return RedirectResponse(url="/notifications", status_code=303)
 
 
@@ -162,18 +163,18 @@ def decline_request(request_id: int, request: Request):
         return RedirectResponse(url="/login", status_code=302)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
     cur.execute("SELECT * FROM device_requests WHERE id = %s", (request_id,))
     req = cur.fetchone()
 
     if not req:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Request not found.", "danger")
         return RedirectResponse(url="/notifications", status_code=303)
 
     if req["request_status"] != "pending":
-        conn.close()
+        return_db_connection(conn)
         flash(request, "This request is no longer pending.", "info")
         return RedirectResponse(url="/notifications", status_code=303)
 
@@ -181,13 +182,13 @@ def decline_request(request_id: int, request: Request):
     device = cur.fetchone()
 
     if not device:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Device not found.", "danger")
         return RedirectResponse(url="/notifications", status_code=303)
 
     owner = device["owner"] or ""
     if owner.strip().lower() != user["username"].lower():
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Access denied. You are not the owner of this device.", "danger")
         return RedirectResponse(url="/notifications", status_code=303)
 
@@ -214,7 +215,7 @@ def decline_request(request_id: int, request: Request):
         request_id=request_id,
     )
 
-    conn.close()
+    return_db_connection(conn)
     flash(request, f"Request from {req['requester_username']} declined.", "success")
     return RedirectResponse(url="/notifications", status_code=303)
 
@@ -226,11 +227,11 @@ def mark_notifications_read(request: Request):
         return RedirectResponse(url="/login", status_code=302)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute(
         "UPDATE notifications SET is_read = TRUE WHERE recipient_username = %s",
         (user["username"],)
     )
     conn.commit()
-    conn.close()
+    return_db_connection(conn)
     return RedirectResponse(url="/notifications", status_code=303)

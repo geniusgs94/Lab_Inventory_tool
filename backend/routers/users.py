@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import RedirectResponse
+from psycopg2.extras import RealDictCursor
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from dependencies import _require_login, flash, render
-from services.db import get_db_connection
+from services.db import get_db_connection, return_db_connection
 
 router = APIRouter()
 
@@ -26,10 +27,10 @@ def users_list(request: Request):
     if redirect:
         return redirect
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT id, username, role FROM users ORDER BY username")
     all_users = cur.fetchall()
-    conn.close()
+    return_db_connection(conn)
     return render("users.html", request, {"users": all_users})
 
 
@@ -74,10 +75,10 @@ def add_user_post(
         return RedirectResponse(url="/users/add", status_code=303)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT id FROM users WHERE username = %s", (username,))
     if cur.fetchone():
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Username already exists.", "danger")
         return RedirectResponse(url="/users/add", status_code=303)
 
@@ -87,7 +88,7 @@ def add_user_post(
         (username, hashed, role),
     )
     conn.commit()
-    conn.close()
+    return_db_connection(conn)
 
     flash(request, "User created successfully.", "success")
     return RedirectResponse(url="/users", status_code=303)
@@ -106,11 +107,11 @@ def delete_user(request: Request, user_id: int):
         return RedirectResponse(url="/users", status_code=302)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT id, username FROM users WHERE id = %s", (user_id,))
     target = cur.fetchone()
     if not target:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "User not found.", "danger")
         return RedirectResponse(url="/users", status_code=302)
 
@@ -131,7 +132,7 @@ def delete_user(request: Request, user_id: int):
 
     cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
     conn.commit()
-    conn.close()
+    return_db_connection(conn)
 
     flash(request, "User deleted successfully.", "success")
     return RedirectResponse(url="/users", status_code=302)
@@ -146,10 +147,10 @@ def reset_password_get(request: Request, user_id: int):
         return redirect
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT id, username FROM users WHERE id = %s", (user_id,))
     target = cur.fetchone()
-    conn.close()
+    return_db_connection(conn)
 
     if not target:
         flash(request, "User not found.", "danger")
@@ -178,17 +179,17 @@ def reset_password_post(
         return RedirectResponse(url=f"/users/reset-password/{user_id}", status_code=303)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT id FROM users WHERE id = %s", (user_id,))
     if not cur.fetchone():
-        conn.close()
+        return_db_connection(conn)
         flash(request, "User not found.", "danger")
         return RedirectResponse(url="/users", status_code=302)
 
-    hashed = generate_password_hash(new_password)
+    hashed = generate_password_hash(new_password, method="pbkdf2:sha256")
     cur.execute("UPDATE users SET password = %s WHERE id = %s", (hashed, user_id))
     conn.commit()
-    conn.close()
+    return_db_connection(conn)
 
     flash(request, "Password reset successfully.", "success")
     return RedirectResponse(url="/users", status_code=303)
@@ -216,10 +217,10 @@ def change_password_post(
         return RedirectResponse(url="/login", status_code=302)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT password FROM users WHERE username = %s", (user["username"],))
     db_user = cur.fetchone()
-    conn.close()
+    return_db_connection(conn)
 
     if not db_user or not check_password_hash(db_user["password"], current_password):
         flash(request, "Current password is incorrect.", "danger")
@@ -237,12 +238,12 @@ def change_password_post(
         flash(request, "New password must differ from current password.", "danger")
         return RedirectResponse(url="/change-password", status_code=303)
 
-    hashed = generate_password_hash(new_password)
+    hashed = generate_password_hash(new_password, method="pbkdf2:sha256")
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("UPDATE users SET password = %s WHERE username = %s", (hashed, user["username"]))
     conn.commit()
-    conn.close()
+    return_db_connection(conn)
 
     flash(request, "Password changed successfully.", "success")
     return RedirectResponse(url="/inventory", status_code=303)

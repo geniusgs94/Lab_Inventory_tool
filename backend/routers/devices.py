@@ -5,10 +5,11 @@ from typing import Optional
 
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from psycopg2.extras import RealDictCursor
 
 from dependencies import flash, render, _require_login
 from services.crypto import decrypt_password, encrypt_password
-from services.db import create_notification, get_db_connection, log_change, log_device_edit
+from services.db import create_notification, get_db_connection, log_change, log_device_edit, return_db_connection
 
 router = APIRouter()
 
@@ -31,7 +32,7 @@ def validate_ip(ip: str) -> bool:
 def check_and_expire_leases():
     """Expire overdue leases and send 2-day warning notifications. Called on every inventory load."""
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
     cur.execute(
         "SELECT id, mac_address, leasee_username, lease_expiry, owner, lease_warning_sent "
@@ -96,7 +97,7 @@ def check_and_expire_leases():
         })
 
     conn.commit()
-    conn.close()
+    return_db_connection(conn)
 
     # --- Fire notifications and audit logs (each uses its own connection) ---
     for info in expired_info:
@@ -146,7 +147,7 @@ def autocomplete_options(request: Request):
         return JSONResponse({"error": "Not logged in"}, status_code=401)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
     cur.execute("SELECT username FROM users ORDER BY username")
     owners = [row["username"] for row in cur.fetchall()]
@@ -172,7 +173,7 @@ def autocomplete_options(request: Request):
     )
     teams = [row["team"] for row in cur.fetchall()]
 
-    conn.close()
+    return_db_connection(conn)
 
     return JSONResponse({
         "owners": owners,
@@ -224,7 +225,7 @@ def inventory(
         params.append(availability)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute(query, params)
     devices = cur.fetchall()
 
@@ -245,7 +246,7 @@ def inventory(
     cur.execute("SELECT DISTINCT mac_address FROM device_requests WHERE request_status = 'pending'")
     pending_macs = {row["mac_address"] for row in cur.fetchall()}
 
-    conn.close()
+    return_db_connection(conn)
 
     return render("index.html", request, {
         "devices": devices,
@@ -298,10 +299,10 @@ def add_item_post(
     actual_owner = user["username"] if user.get("role") == "user" else owner
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT 1 FROM devices WHERE mac_address = %s", (mac,))
     if cur.fetchone():
-        conn.close()
+        return_db_connection(conn)
         flash(request, "MAC address already exists.", "danger")
         return RedirectResponse(url="/add", status_code=303)
 
@@ -316,7 +317,7 @@ def add_item_post(
         (mac, device_model, actual_owner, availability, reporting_manager, team, ip_address, location, lease, encrypted_password),
     )
     conn.commit()
-    conn.close()
+    return_db_connection(conn)
     return RedirectResponse(url="/inventory", status_code=303)
 
 
@@ -331,10 +332,10 @@ def edit_item_get(id: int, request: Request):
         return RedirectResponse(url="/login", status_code=302)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM devices WHERE id = %s", (id,))
     device = cur.fetchone()
-    conn.close()
+    return_db_connection(conn)
 
     if not device:
         flash(request, "Device not found", "danger")
@@ -369,17 +370,17 @@ def edit_item_post(
         return RedirectResponse(url="/login", status_code=302)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM devices WHERE id = %s", (id,))
     device = cur.fetchone()
 
     if not device:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Device not found", "danger")
         return RedirectResponse(url="/inventory", status_code=302)
 
     if not (user.get("role") == "admin" or device["owner"] == user["username"]):
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Access denied. Only the owner or an admin can edit this device.", "danger")
         return RedirectResponse(url="/inventory", status_code=403)
 
@@ -393,14 +394,14 @@ def edit_item_post(
         try:
             new_mac = format_mac_address(mac_address) if mac_address.strip() else device["mac_address"]
         except ValueError as e:
-            conn.close()
+            return_db_connection(conn)
             flash(request, str(e), "danger")
             return RedirectResponse(url=f"/edit/{id}", status_code=303)
         # Reject if the new MAC is already taken by a different device
         if new_mac != device["mac_address"]:
             cur.execute("SELECT 1 FROM devices WHERE mac_address = %s AND id != %s", (new_mac, id))
             if cur.fetchone():
-                conn.close()
+                return_db_connection(conn)
                 flash(request, "MAC address already exists on another device.", "danger")
                 return RedirectResponse(url=f"/edit/{id}", status_code=303)
     else:
@@ -455,7 +456,7 @@ def edit_item_post(
         ),
     )
     conn.commit()
-    conn.close()
+    return_db_connection(conn)
 
     for field, old_val, new_val in changes:
         log_device_edit(device["mac_address"], field, old_val, new_val, user["username"])
@@ -478,10 +479,10 @@ def reveal_password(id: int, request: Request):
         return JSONResponse({"error": "Not logged in"}, status_code=401)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM devices WHERE id = %s", (id,))
     device = cur.fetchone()
-    conn.close()
+    return_db_connection(conn)
 
     if not device:
         return JSONResponse({"error": "Device not found"}, status_code=404)
@@ -504,12 +505,12 @@ def reserve_device(id: int, request: Request):
         return RedirectResponse(url="/login", status_code=302)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM devices WHERE id = %s", (id,))
     device = cur.fetchone()
 
     if not device:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Device not found.", "danger")
         return RedirectResponse(url="/inventory", status_code=303)
 
@@ -524,7 +525,7 @@ def reserve_device(id: int, request: Request):
     else:
         flash(request, "Device is not available for reservation.", "danger")
 
-    conn.close()
+    return_db_connection(conn)
     return RedirectResponse(url="/inventory", status_code=303)
 
 
@@ -535,12 +536,12 @@ def release_device(id: int, request: Request):
         return RedirectResponse(url="/login", status_code=302)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM devices WHERE id = %s", (id,))
     device = cur.fetchone()
 
     if not device:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Device not found.", "danger")
         return RedirectResponse(url="/inventory", status_code=303)
 
@@ -581,7 +582,7 @@ def release_device(id: int, request: Request):
     else:
         flash(request, "You are not allowed to release this device.", "danger")
 
-    conn.close()
+    return_db_connection(conn)
     return RedirectResponse(url="/inventory", status_code=303)
 
 
@@ -610,23 +611,23 @@ def request_device(
         return RedirectResponse(url="/inventory", status_code=303)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM devices WHERE id = %s", (id,))
     device = cur.fetchone()
 
     if not device:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Device not found.", "danger")
         return RedirectResponse(url="/inventory", status_code=303)
 
     owner = device["owner"] or ""
     if owner.strip().lower() == user["username"].lower():
-        conn.close()
+        return_db_connection(conn)
         flash(request, "You already own this device.", "info")
         return RedirectResponse(url="/inventory", status_code=303)
 
     if device["availability"] != "In Use":
-        conn.close()
+        return_db_connection(conn)
         flash(request, "You can only request a device that is currently In Use.", "danger")
         return RedirectResponse(url="/inventory", status_code=303)
 
@@ -636,7 +637,7 @@ def request_device(
         (device["mac_address"], user["username"])
     )
     if cur.fetchone():
-        conn.close()
+        return_db_connection(conn)
         flash(request, "You already have a pending request for this device.", "info")
         return RedirectResponse(url="/inventory", status_code=303)
 
@@ -649,7 +650,7 @@ def request_device(
     request_row = cur.fetchone()
     request_id = request_row["id"]
     conn.commit()
-    conn.close()
+    return_db_connection(conn)
 
     create_notification(
         recipient_username=owner.strip(),
@@ -682,35 +683,35 @@ def renew_lease(
         return RedirectResponse(url="/inventory", status_code=303)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM devices WHERE id = %s", (id,))
     device = cur.fetchone()
 
     if not device:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Device not found.", "danger")
         return RedirectResponse(url="/inventory", status_code=303)
 
     leasee = device.get("leasee_username") or ""
     if leasee.strip().lower() != user["username"].lower():
-        conn.close()
+        return_db_connection(conn)
         flash(request, "You are not the current leasee of this device.", "danger")
         return RedirectResponse(url="/inventory", status_code=303)
 
     current_expiry = device.get("lease_expiry")
     if not current_expiry:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "No active lease found.", "danger")
         return RedirectResponse(url="/inventory", status_code=303)
 
     if renewal_date <= current_expiry:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Renewal date must be after the current lease expiry.", "danger")
         return RedirectResponse(url="/inventory", status_code=303)
 
     max_renewal = current_expiry + timedelta(days=7)
     if renewal_date > max_renewal:
-        conn.close()
+        return_db_connection(conn)
         flash(
             request,
             f"Renewal date cannot exceed 7 days from current expiry ({current_expiry.strftime('%Y-%m-%d')}).",
@@ -724,7 +725,7 @@ def renew_lease(
         (device["mac_address"], user["username"])
     )
     if cur.fetchone():
-        conn.close()
+        return_db_connection(conn)
         flash(request, "You already have a pending renewal request for this device.", "info")
         return RedirectResponse(url="/inventory", status_code=303)
 
@@ -737,7 +738,7 @@ def renew_lease(
     request_row = cur.fetchone()
     request_id = request_row["id"]
     conn.commit()
-    conn.close()
+    return_db_connection(conn)
 
     owner = device["owner"] or ""
     create_notification(
@@ -761,18 +762,18 @@ def claim_device(id: int, request: Request):
         return RedirectResponse(url="/login", status_code=302)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM devices WHERE id = %s", (id,))
     device = cur.fetchone()
 
     if not device:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Device not found.", "danger")
         return RedirectResponse(url="/inventory", status_code=303)
 
     owner = device["owner"] or ""
     if device["availability"] != "Available" or owner.strip():
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Device is not available to claim.", "danger")
         return RedirectResponse(url="/inventory", status_code=303)
 
@@ -781,7 +782,7 @@ def claim_device(id: int, request: Request):
         (device["mac_address"],)
     )
     if cur.fetchone():
-        conn.close()
+        return_db_connection(conn)
         flash(request, "This device has a pending request and cannot be claimed.", "danger")
         return RedirectResponse(url="/inventory", status_code=303)
 
@@ -789,7 +790,7 @@ def claim_device(id: int, request: Request):
     conn.commit()
     log_device_edit(device["mac_address"], "owner", "", user["username"], user["username"])
     log_change(user["username"], "Claim", device["mac_address"], {"new_owner": user["username"]})
-    conn.close()
+    return_db_connection(conn)
     flash(request, "Device claimed. Click 'Use' to mark it as In Use.", "success")
     return RedirectResponse(url="/inventory", status_code=303)
 
@@ -801,23 +802,23 @@ def use_device(id: int, request: Request):
         return RedirectResponse(url="/login", status_code=302)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM devices WHERE id = %s", (id,))
     device = cur.fetchone()
 
     if not device:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Device not found.", "danger")
         return RedirectResponse(url="/inventory", status_code=303)
 
     owner = device["owner"] or ""
     if owner.strip().lower() != user["username"].lower():
-        conn.close()
+        return_db_connection(conn)
         flash(request, "You are not the owner of this device.", "danger")
         return RedirectResponse(url="/inventory", status_code=303)
 
     if device["availability"] != "Available":
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Device is already marked as In Use.", "info")
         return RedirectResponse(url="/inventory", status_code=303)
 
@@ -825,7 +826,7 @@ def use_device(id: int, request: Request):
     conn.commit()
     log_device_edit(device["mac_address"], "availability", "Available", "In Use", user["username"])
     log_change(user["username"], "Use", device["mac_address"], {"used_by": user["username"]})
-    conn.close()
+    return_db_connection(conn)
     flash(request, "Device is now marked as In Use.", "success")
     return RedirectResponse(url="/inventory", status_code=303)
 
@@ -841,22 +842,22 @@ def delete_item(id: int, request: Request):
         return RedirectResponse(url="/login", status_code=302)
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT * FROM devices WHERE id = %s", (id,))
     device = cur.fetchone()
 
     if not device:
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Device not found", "danger")
         return RedirectResponse(url="/inventory", status_code=302)
 
     if user.get("role") != "admin":
-        conn.close()
+        return_db_connection(conn)
         flash(request, "Only admins can delete devices.", "danger")
         return RedirectResponse(url="/inventory", status_code=302)
 
     cur.execute("DELETE FROM devices WHERE id = %s", (id,))
     conn.commit()
     log_change(user["username"], "Delete", device["mac_address"], dict(device))
-    conn.close()
+    return_db_connection(conn)
     return RedirectResponse(url="/inventory", status_code=302)

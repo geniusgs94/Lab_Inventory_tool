@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from routers import auth, backup, devices, history, notifications, users
+from services.db import close_pool, init_pool
 
 load_dotenv()
 
@@ -41,6 +42,7 @@ _scheduler = BackgroundScheduler()
 
 @app.on_event("startup")
 def start_scheduler():
+    init_pool(minconn=2, maxconn=10)
     from services.backup import create_backup
     _scheduler.add_job(
         create_backup,
@@ -54,3 +56,4 @@ def start_scheduler():
 @app.on_event("shutdown")
 def stop_scheduler():
     _scheduler.shutdown(wait=False)
+    close_pool()

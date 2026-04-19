@@ -4,11 +4,11 @@ import os
 import re
 import subprocess
 from datetime import datetime
-from urllib.parse import urlparse
 
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
+from services.db import get_database_config
 
 load_dotenv()
 
@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 BACKUP_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "backups"))
 MAX_BACKUPS = 7
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 
 def _safe_filename(filename: str) -> str:
@@ -92,8 +91,9 @@ def _topological_sort(tables: list, fk_deps: dict) -> list:
 
 def _python_dump(filepath: str):
     """Generate a SQL dump using psycopg2 when pg_dump CLI is unavailable."""
-    meta_conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-    data_conn = psycopg2.connect(DATABASE_URL)
+    db_config = get_database_config()
+    meta_conn = psycopg2.connect(cursor_factory=psycopg2.extras.RealDictCursor, **db_config)
+    data_conn = psycopg2.connect(**db_config)
     meta_cur = meta_conn.cursor()
     data_cur = data_conn.cursor()
 
@@ -280,12 +280,12 @@ def create_backup() -> dict:
     filename = f"backup_{timestamp}.sql"
     filepath = os.path.join(BACKUP_DIR, filename)
 
-    parsed = urlparse(DATABASE_URL)
-    host = parsed.hostname or "localhost"
-    port = str(parsed.port or 5432)
-    dbname = parsed.path.lstrip("/")
-    user = parsed.username or ""
-    password = parsed.password or ""
+    params = get_database_config()
+    host = params.get("host", "localhost")
+    port = params.get("port", "5432")
+    dbname = params.get("dbname", "")
+    user = params.get("user", "")
+    password = params.get("password", "")
 
     used_pgdump = False
     try:
@@ -345,7 +345,7 @@ def restore_backup(filename: str) -> None:
     with open(filepath, "r", encoding="utf-8") as f:
         sql_content = f.read()
 
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(**get_database_config())
     conn.autocommit = True
     cur = conn.cursor()
     try:
