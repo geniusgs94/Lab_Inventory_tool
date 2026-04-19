@@ -1,11 +1,14 @@
 import os
+from datetime import datetime, timedelta
 
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from routers import auth, devices, history, notifications
+from routers import auth, backup, devices, history, notifications, users
 
 load_dotenv()
 
@@ -30,3 +33,24 @@ app.include_router(auth.router)
 app.include_router(devices.router)
 app.include_router(history.router)
 app.include_router(notifications.router)
+app.include_router(users.router)
+app.include_router(backup.router)
+
+_scheduler = BackgroundScheduler()
+
+
+@app.on_event("startup")
+def start_scheduler():
+    from services.backup import create_backup
+    _scheduler.add_job(
+        create_backup,
+        IntervalTrigger(weeks=1, start_date=datetime.now() + timedelta(minutes=1)),
+        id="weekly_backup",
+        replace_existing=True,
+    )
+    _scheduler.start()
+
+
+@app.on_event("shutdown")
+def stop_scheduler():
+    _scheduler.shutdown(wait=False)

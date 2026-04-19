@@ -1,0 +1,39 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="history-container">
+    <h2>User Management</h2>
+    <div style="margin-bottom: 16px;">
+        <a href="{{ url_for('add_user') }}" class="btn-primary">Add User</a>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Role</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in users %}
+            <tr>
+                <td>{{ u.username }}</td>
+                <td>{{ u.role }}</td>
+                <td>
+                    <a href="{{ url_for('reset_password', user_id=u.id) }}" class="btn-secondary" style="margin-right: 8px;">Reset Password</a>
+                    {% if u.id != session.user_id %}
+                        <a href="{{ url_for('delete_user', user_id=u.id) }}"
+                           class="btn-request"
+                           onclick="return confirm('Are you sure you want to delete user \'{{ u.username }}\'? Their devices will be released.')">
+                            Delete
+                        </a>
+                    {% else %}
+                        <span style="color: #999; font-size: 13px;">(you)</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

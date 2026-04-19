@@ -1,0 +1,54 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<div class="history-container">
+    <h2>Database Backups</h2>
+
+    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+        <form method="POST" action="/backups/create" style="margin: 0;">
+            <button type="submit" class="btn-primary">Create Backup Now</button>
+        </form>
+        <span style="color: #666; font-size: 13px;">Next scheduled backup runs automatically every 7 days.</span>
+    </div>
+
+    {% if backups %}
+    <table>
+        <thead>
+            <tr>
+                <th>Filename</th>
+                <th>Size</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for b in backups %}
+            <tr>
+                <td style="font-family: monospace; font-size: 13px;">{{ b.filename }}</td>
+                <td>{{ b.size_human }}</td>
+                <td>{{ b.created_at_formatted }}</td>
+                <td style="white-space: nowrap;">
+                    <a href="{{ url_for('download_backup', filename=b.filename) }}"
+                       class="btn-secondary"
+                       style="margin-right: 6px;">Download</a>
+
+                    <form method="POST" action="/backups/restore/{{ b.filename }}"
+                          style="display: inline; margin-right: 6px;"
+                          onsubmit="return confirm('WARNING: This will replace all current data with the backup from {{ b.filename }}. This cannot be undone. Are you sure?')">
+                        <input type="hidden" name="confirm" value="yes">
+                        <button type="submit" class="btn-secondary">Restore</button>
+                    </form>
+
+                    <a href="{{ url_for('delete_backup', filename=b.filename) }}"
+                       class="btn-request"
+                       onclick="return confirm('Delete backup {{ b.filename }}?')">Delete</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: #666; margin-top: 24px;">No backups yet. Click "Create Backup Now" to create your first backup.</p>
+    {% endif %}
+</div>
+{% endblock %}

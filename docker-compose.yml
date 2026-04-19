@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16
+    container_name: lab_inventory_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lab_inventory}
+      POSTGRES_USER: ${POSTGRES_USER:-labuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-labpassword}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-labuser} -d ${POSTGRES_DB:-lab_inventory}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lab_inventory_web
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-labuser}:${POSTGRES_PASSWORD:-labpassword}@db:5432/${POSTGRES_DB:-lab_inventory}
+      SECRET_KEY: ${SECRET_KEY}
+      FERNET_KEY: ${FERNET_KEY}
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:

@@ -1,10 +1,13 @@
-# Virtual environments
-venv/
+# OS / editor files
+.DS_Store
+Thumbs.db
+.idea/
+
+# Python environments and caches
 .venv/
+venv/
 env/
 ENV/
-
-# Python cache and tooling
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -13,39 +16,32 @@ __pycache__/
 .coverage
 htmlcov/
 
-# Environment variables
+# Local environment files
 .env
-.env.*
-!.env.example
+backend/.env
 
-# OS files
-.DS_Store
-Thumbs.db
-
-# IDE files
-.idea/
-.vscode/
-
-# Database files
+# Local databases and generated backups
 *.db
+backend/backups/*.sql
 
-# Logs
-*.log
-
-# Local working notes
-PostgresMigration.txt
-RefactoringFolderStructure.txt
-Test.txt
-autofill.txt
+# Project-local notes and scratch files
 actions.txt
-leasefunctionality.txt
+autofill.txt
 datecalendar.txt
 documentation.txt
 editdevicepage.txt
 fastapi.txt
 historyimplementation.txt
+leasefunctionality.txt
 loginpage.txt
 passwordimplementation.txt
+PostgresMigration.txt
+RefactoringFolderStructure.txt
 sqlconnectionpool.txt
+Test.txt
 userVSadmin.txt
+usermanagement.txt
 
+backend/actions.txt
+backend/databasebackup.txt
+backend/leasefunctionality.txt
