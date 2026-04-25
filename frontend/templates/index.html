@@ -3,6 +3,23 @@
 {% block content %}
 <h2>Device Inventory</h2>
 
+{% if session.role == 'admin' %}
+<div style="margin-bottom:12px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+    <a href="/export"
+       style="background-color:#1a6e2e; color:white; padding:7px 14px; border-radius:4px; text-decoration:none; font-size:0.9rem;">
+        Export Excel
+    </a>
+
+    <label for="import-file-input"
+           style="background-color:#0055a5; color:white; padding:7px 14px; border-radius:4px; cursor:pointer; font-size:0.9rem;">
+        Import Excel
+    </label>
+    <input type="file" id="import-file-input" accept=".xlsx" style="display:none;">
+
+    <span id="import-status" style="font-size:0.88rem;"></span>
+</div>
+{% endif %}
+
 <form method="get" action="{{ url_for('inventory') }}" class="search-form">
     <input
         type="text"
@@ -188,6 +205,48 @@ async function togglePassword(deviceId, btn) {
     } catch (e) {
         display.textContent = 'Error';
     }
+}
+
+const importInput = document.getElementById('import-file-input');
+if (importInput) {
+    importInput.addEventListener('change', async function () {
+        const file = this.files[0];
+        if (!file) return;
+
+        const status = document.getElementById('import-status');
+        status.style.color = '#555';
+        status.textContent = 'Uploading…';
+
+        const formData = new FormData();
+        formData.append('file', file);
+        this.value = '';
+
+        try {
+            const resp = await fetch('/import', { method: 'POST', body: formData });
+            const data = await resp.json();
+
+            if (!resp.ok) {
+                status.style.color = '#c0392b';
+                status.textContent = 'Error: ' + (data.error || 'Unknown error');
+                return;
+            }
+
+            let msg = `Inserted: ${data.inserted}  |  Overwritten: ${data.overwritten.length}`;
+            if (data.errors && data.errors.length) {
+                msg += `  |  Row errors: ${data.errors.length}`;
+                console.warn('Import row errors:', data.errors);
+            }
+            status.style.color = data.errors && data.errors.length ? '#e67e22' : '#1a6e2e';
+            status.textContent = msg;
+
+            if (data.inserted > 0 || data.overwritten.length > 0) {
+                setTimeout(() => location.reload(), 1200);
+            }
+        } catch (e) {
+            status.style.color = '#c0392b';
+            status.textContent = 'Upload failed. Check console.';
+        }
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function () {
