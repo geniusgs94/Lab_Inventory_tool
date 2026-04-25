@@ -29,6 +29,18 @@ def validate_ip(ip: str) -> bool:
         return False
 
 
+def is_lease_active(device) -> bool:
+    leasee = (device.get("leasee_username") or "").strip()
+    expiry = device.get("lease_expiry")
+    return bool(leasee and expiry is not None and datetime.now() < expiry)
+
+
+def get_effective_controller(device) -> str:
+    if is_lease_active(device):
+        return (device.get("leasee_username") or "").strip()
+    return (device.get("owner") or "").strip()
+
+
 def check_and_expire_leases():
     """Expire overdue leases and send 2-day warning notifications. Called on every inventory load."""
     conn = get_db_connection()
@@ -206,19 +218,22 @@ def inventory(
         like = f"%{search}%"
         query += """
             AND (
-                mac_address LIKE %s OR
-                device_model LIKE %s OR
-                owner LIKE %s OR
-                availability LIKE %s OR
-                reporting_manager LIKE %s OR
-                team LIKE %s OR
-                ip_address LIKE %s OR
-                location LIKE %s OR
-                lease LIKE %s OR
-                leasee_username LIKE %s
+                mac_address ILIKE %s OR
+                device_model ILIKE %s OR
+                owner ILIKE %s OR
+                availability ILIKE %s OR
+                reporting_manager ILIKE %s OR
+                team ILIKE %s OR
+                ip_address ILIKE %s OR
+                location ILIKE %s OR
+                lease ILIKE %s OR
+                leasee_username ILIKE %s OR
+                project ILIKE %s OR
+                console ILIKE %s OR
+                power ILIKE %s
             )
         """
-        params.extend([like] * 10)
+        params.extend([like] * 13)
 
     if availability:
         query += " AND availability = %s"
@@ -248,8 +263,19 @@ def inventory(
 
     return_db_connection(conn)
 
+    now = datetime.now()
+    enriched = []
+    for d in devices:
+        d = dict(d)
+        leasee = (d.get("leasee_username") or "").strip()
+        expiry = d.get("lease_expiry")
+        active = bool(leasee and expiry is not None and now < expiry)
+        d["lease_active"] = active
+        d["effective_controller"] = leasee if active else (d.get("owner") or "").strip()
+        enriched.append(d)
+
     return render("index.html", request, {
-        "devices": devices,
+        "devices": enriched,
         "my_pending_macs": my_pending_macs,
         "my_pending_renewal_macs": my_pending_renewal_macs,
         "pending_macs": pending_macs,
@@ -280,6 +306,9 @@ def add_item_post(
     ip_address: str = Form(""),
     location: str = Form(""),
     lease: str = Form(""),
+    project: str = Form(""),
+    console: str = Form(""),
+    power: str = Form(""),
     password: str = Form(""),
 ):
     user = _require_login(request)
@@ -311,10 +340,12 @@ def add_item_post(
     cur.execute(
         """
         INSERT INTO devices
-            (mac_address, device_model, owner, availability, reporting_manager, team, ip_address, location, lease, password)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            (mac_address, device_model, owner, availability, reporting_manager, team,
+             ip_address, location, lease, project, console, power, password)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        (mac, device_model, actual_owner, availability, reporting_manager, team, ip_address, location, lease, encrypted_password),
+        (mac, device_model, actual_owner, availability, reporting_manager, team,
+         ip_address, location, lease, project or None, console or None, power or None, encrypted_password),
     )
     conn.commit()
     return_db_connection(conn)
@@ -341,8 +372,8 @@ def edit_item_get(id: int, request: Request):
         flash(request, "Device not found", "danger")
         return RedirectResponse(url="/inventory", status_code=302)
 
-    if not (user.get("role") == "admin" or device["owner"] == user["username"]):
-        flash(request, "Access denied. Only the owner or an admin can edit this device.", "danger")
+    if not (user.get("role") == "admin" or get_effective_controller(device).lower() == user["username"].lower()):
+        flash(request, "Access denied. Only the device controller or an admin can edit this device.", "danger")
         return RedirectResponse(url="/inventory", status_code=302)
 
     device_dict = dict(device)
@@ -364,6 +395,9 @@ def edit_item_post(
     mac_address: str = Form(""),
     device_model: str = Form(""),
     lease: str = Form(""),
+    project: str = Form(""),
+    console: str = Form(""),
+    power: str = Form(""),
 ):
     user = _require_login(request)
     if not user:
@@ -379,9 +413,9 @@ def edit_item_post(
         flash(request, "Device not found", "danger")
         return RedirectResponse(url="/inventory", status_code=302)
 
-    if not (user.get("role") == "admin" or device["owner"] == user["username"]):
+    if not (user.get("role") == "admin" or get_effective_controller(device).lower() == user["username"].lower()):
         return_db_connection(conn)
-        flash(request, "Access denied. Only the owner or an admin can edit this device.", "danger")
+        flash(request, "Access denied. Only the device controller or an admin can edit this device.", "danger")
         return RedirectResponse(url="/inventory", status_code=403)
 
     is_admin = user.get("role") == "admin"
@@ -416,6 +450,9 @@ def edit_item_post(
         "team": team,
         "ip_address": ip_address,
         "location": location,
+        "project": project,
+        "console": console,
+        "power": power,
     }
     if is_admin:
         editable_fields["mac_address"] = new_mac
@@ -438,7 +475,7 @@ def edit_item_post(
         UPDATE devices
         SET mac_address = %s, device_model = %s, owner = %s, availability = %s,
             reporting_manager = %s, team = %s, ip_address = %s, location = %s, lease = %s,
-            password = %s
+            project = %s, console = %s, power = %s, password = %s
         WHERE id = %s
         """,
         (
@@ -451,6 +488,9 @@ def edit_item_post(
             ip_address,
             location,
             new_lease,
+            project or None,
+            console or None,
+            power or None,
             encrypted_password,
             id,
         ),
@@ -487,7 +527,7 @@ def reveal_password(id: int, request: Request):
     if not device:
         return JSONResponse({"error": "Device not found"}, status_code=404)
 
-    if not (user.get("role") == "admin" or device["owner"] == user["username"]):
+    if not (user.get("role") == "admin" or get_effective_controller(device).lower() == user["username"].lower()):
         return JSONResponse({"error": "Access denied"}, status_code=403)
 
     plain = decrypt_password(device.get("password", "") or "")
@@ -546,7 +586,8 @@ def release_device(id: int, request: Request):
         return RedirectResponse(url="/inventory", status_code=303)
 
     owner = device["owner"] or ""
-    if device["availability"] == "In Use" and owner.strip().lower() == user["username"].lower():
+    effective = get_effective_controller(device)
+    if device["availability"] == "In Use" and effective.lower() == user["username"].lower():
         mac = device["mac_address"]
         leasee = device.get("leasee_username") or ""
         lease_expiry = device.get("lease_expiry")
@@ -571,7 +612,7 @@ def release_device(id: int, request: Request):
 
         log_change(user["username"], "Release", mac, {"released_by": user["username"]})
 
-        if leasee:
+        if leasee and leasee.strip().lower() != user["username"].lower():
             create_notification(
                 recipient_username=leasee,
                 message=f"Your lease for device {mac} has been ended by the owner.",
@@ -621,9 +662,10 @@ def request_device(
         return RedirectResponse(url="/inventory", status_code=303)
 
     owner = device["owner"] or ""
-    if owner.strip().lower() == user["username"].lower():
+    effective = get_effective_controller(device)
+    if effective.lower() == user["username"].lower():
         return_db_connection(conn)
-        flash(request, "You already own this device.", "info")
+        flash(request, "You cannot request a device you currently control.", "info")
         return RedirectResponse(url="/inventory", status_code=303)
 
     if device["availability"] != "In Use":

@@ -12,6 +12,9 @@ class DeviceCreate(BaseModel):
     ip_address: str
     location: str
     lease: str
+    project: Optional[str] = None
+    console: Optional[str] = None
+    power: Optional[str] = None
 
 
 class DeviceEdit(BaseModel):
@@ -20,3 +23,6 @@ class DeviceEdit(BaseModel):
     team: str
     ip_address: str
     location: str
+    project: Optional[str] = None
+    console: Optional[str] = None
+    power: Optional[str] = None

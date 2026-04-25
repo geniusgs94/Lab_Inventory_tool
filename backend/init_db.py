@@ -104,6 +104,9 @@ def init_db():
         ("devices.lease_warning_sent",      "ALTER TABLE devices ADD COLUMN IF NOT EXISTS lease_warning_sent BOOLEAN DEFAULT FALSE"),
         ("device_requests.requested_lease_date", "ALTER TABLE device_requests ADD COLUMN IF NOT EXISTS requested_lease_date TIMESTAMP"),
         ("device_requests.request_type",    "ALTER TABLE device_requests ADD COLUMN IF NOT EXISTS request_type TEXT DEFAULT 'request'"),
+        ("devices.project",                 "ALTER TABLE devices ADD COLUMN IF NOT EXISTS project TEXT"),
+        ("devices.console",                 "ALTER TABLE devices ADD COLUMN IF NOT EXISTS console TEXT"),
+        ("devices.power",                   "ALTER TABLE devices ADD COLUMN IF NOT EXISTS power TEXT"),
     ]
 
     for name, sql in migrations:

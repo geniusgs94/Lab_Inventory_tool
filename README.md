@@ -21,6 +21,7 @@ A web-based internal tool for managing lab hardware. Teams can track device owne
 | Form parsing | python-multipart | 0.0.9 |
 | Environment config | python-dotenv | 1.0.1 |
 | Background jobs | APScheduler (BackgroundScheduler) | 3.10.4 |
+| Excel import / export | openpyxl | 3.1.5 |
 | Frontend | HTML + CSS + vanilla JavaScript | — |
 | Deployment | Heroku-compatible via Procfile | — |
 
@@ -44,7 +45,8 @@ Lab_Inventory_tool-master/
 │   │   ├── history.py                # Paginated device-edit audit log
 │   │   ├── notifications.py          # Notification inbox, accept/decline device requests
 │   │   ├── users.py                  # In-app user management (admin): list, add, delete, reset password; self-service change-password
-│   │   └── backup.py                 # Database backup management (admin): list, create, download, restore, delete
+│   │   ├── backup.py                 # Database backup management (admin): list, create, download, restore, delete
+│   │   └── importexport.py           # Excel import/export (admin): GET /export downloads .xlsx, POST /import uploads .xlsx
 │   │
 │   ├── services/                     # Shared business-logic and I/O modules
 │   │   ├── db.py                     # ThreadedConnectionPool, get/return connection, log_change, log_device_edit, create_notification, get_unread_count
@@ -110,12 +112,16 @@ Two roles exist: `admin` and `user`. The role is embedded in the JWT and checked
 | View inventory | Yes | Yes |
 | Add device | Yes (any owner) | Yes (owner forced to self) |
 | Edit device — identity fields (MAC, model, owner, lease note) | Yes | No (read-only in form) |
-| Edit device — operational fields (availability, IP, location, reporting manager, team) | Yes | Yes (own devices only) |
-| Edit device password | Yes (any device) | Yes (own devices only) |
-| Reveal device password | Yes (any device) | Yes (own devices only) |
+| Edit device — operational fields (availability, IP, location, reporting manager, team) | Yes | Yes (effective controller only) |
+| Edit device password | Yes (any device) | Yes (effective controller only) |
+| Reveal device password | Yes (any device) | Yes (effective controller only) |
 | Delete device | Yes | No |
 | Claim unowned device | Yes | Yes |
-| Use / Release / Request / Renew lease | Yes | Yes (with ownership rules) |
+| Use (mark claimed device as In Use) | Yes | Yes (owner only) |
+| Release device | Yes | Yes (effective controller — owner or active leasee) |
+| Request device lease | Yes | Yes (non-controller only) |
+| Renew lease | Yes | Yes (current leasee only) |
+| Accept / Decline lease requests | Yes | Yes (device owner only) |
 | View audit history | Yes | Yes |
 | View and act on notifications | Yes | Yes |
 | Change own password | Yes | Yes |
@@ -140,9 +146,9 @@ The inventory page (`/inventory`) shows all devices in a table with columns: MAC
 
 **Editing a device** (`/edit/{id}`)
 
-- Access is restricted to the device owner or an admin.
+- Access is restricted to the **effective controller** (owner or active leasee) or an admin.
 - **Admins** can edit all fields: MAC address, model, owner, availability, reporting manager, team, IP address, location, lease note, and password.
-- **Regular users** can edit only: availability, reporting manager, team, IP address, location, and password. Identity fields (MAC, model, owner, lease note) are rendered as read-only in the form and silently ignored if submitted.
+- **Regular users (effective controller)** can edit only: availability, reporting manager, team, IP address, location, and password. Identity fields (MAC, model, owner, lease note) are rendered as read-only in the form and silently ignored if submitted. The `owner` field is never changed by this form for non-admins.
 - Every changed field is written to `device_edit_history` (audit log). Password changes are logged as `"****" → "****"` — the value is never logged in plain text.
 
 **Deleting a device** (`/delete/{id}`)
@@ -157,7 +163,7 @@ Inserting or editing to a MAC address that is already used by another device is 
 
 ### Search and Filter
 
-- **Full-text search** — The `?search=` query parameter runs a `LIKE '%term%'` across: MAC address, model, owner, availability, reporting manager, team, IP address, location, lease note, and leasee username.
+- **Full-text search** — The `?search=` query parameter runs a case-insensitive `ILIKE '%term%'` across: MAC address, model, owner, availability, reporting manager, team, IP address, location, lease note, leasee username, project, console, and power. Searching `iphone`, `iPhone`, or `IPHONE` all return the same results.
 - **Availability filter** — The `?availability=` dropdown filters to `Available` or `In Use`.
 - Both can be combined. A **Clear** button resets to the unfiltered view.
 
@@ -172,6 +178,22 @@ The **Owner**, **Reporting Manager**, **Device Model**, and **Team** fields on t
 - Keyboard navigation: **↓ / ↑** to move through the list, **Enter** to select, **Escape** to dismiss.
 - Clicking outside the dropdown or blurring the field also dismisses it.
 - The autocomplete does **not** restrict input — any value can be typed freely.
+
+---
+
+### Ownership vs. Lease (Effective Controller Model)
+
+The system separates **permanent ownership** from **temporary control**:
+
+- **Owner** (`owner` field) — the permanent owner of a device. Ownership never changes due to lease actions. Only an admin can reassign the owner field.
+- **Leasee** (`leasee_username` + `lease_expiry`) — a user who has been granted temporary control by the owner.
+- **Effective controller** — dynamically determined on every request:
+  - If a lease is **active** (`leasee_username` is set, `lease_expiry` is set, and `now < lease_expiry`) → the **leasee** is in control.
+  - Otherwise → the **owner** is in control.
+
+All permission checks (edit, release, password reveal, request blocking) use the effective controller, not the static owner field. The Lease column in the inventory table shows an "In control: \<username\>" label when a lease is active.
+
+The owner remains the sole authority for accepting or declining incoming lease requests — a leasee cannot sub-lease a device to a third party.
 
 ---
 
@@ -191,15 +213,15 @@ Devices follow a state machine based on `availability` (`Available` / `In Use`) 
 
 **Reserve** — A one-step shortcut that sets both owner and `In Use` simultaneously. Shown in the UI when a device is free.
 
-**Release** — The owner of an `In Use` device releases it back to `Available` with no owner. All pending requests are cancelled, the active lease is cleared, and the leasee (if any) is notified. If a leasee is active, the UI shows a confirmation warning.
+**Release** — The **effective controller** (owner or active leasee) of an `In Use` device releases it back to `Available` with no owner. All pending requests are cancelled, the active lease is cleared, and the leasee (if any) is notified. If the leasee releases their own lease, no self-notification is sent. The UI shows a confirmation warning whenever an active leasee exists.
 
 ---
 
 ### Device Request and Approval System
 
-When a device is `In Use`, non-owners can queue a time-limited lease request:
+When a device is `In Use`, users who are not the effective controller can queue a time-limited lease request:
 
-1. **Submit request** — Click **Request** on any `In Use` device you don't own. A calendar date picker appears constrained to tomorrow through 7 days from today. The request is created as `pending` and the owner is notified.
+1. **Submit request** — Click **Request** on any `In Use` device you don't currently control. A calendar date picker appears constrained to tomorrow through 7 days from today. The request is created as `pending` and the owner is notified.
 2. **Owner decides** — Accept / Decline buttons appear on the notification. The server re-checks ownership before acting.
 3. **On Accept** — The requester becomes `leasee_username` with the approved `lease_expiry`. All other competing `pending` requests for the same device are automatically cancelled. If a previous leasee existed, they are notified.
 4. **On Decline** — The request moves to `declined` and the requester is notified.
@@ -219,7 +241,7 @@ Each device tracks `leasee_username`, `lease_expiry` (timestamp), and `lease_war
 
 **Lease renewal** — The current leasee can extend their lease. Clicking **Renew Lease** opens a calendar picker constrained to `expiry + 1 day` through `expiry + 7 days`. The renewal is a new `pending` request of type `renewal`; the owner approves or declines via notifications. On approval, only `lease_expiry` is updated and `lease_warning_sent` is reset. A user cannot submit two simultaneous pending renewals for the same device.
 
-**UI indicators** — The Lease column shows `leasee_username (expires: Mon D, YYYY)`. The Action column shows a disabled **Renewal Pending** button while a renewal is outstanding.
+**UI indicators** — When a lease is active, the Lease column shows `leasee_username (expires: Mon D, YYYY)` with an "In control: \<username\>" sub-label. If a leasee record exists but the expiry has passed (before the expiry job clears it), the column shows `leasee_username (expired)`. The Action column shows a disabled **Renewal Pending** button while a renewal is outstanding.
 
 ---
 
@@ -227,7 +249,7 @@ Each device tracks `leasee_username`, `lease_expiry` (timestamp), and `lease_war
 
 - Device passwords are stored **Fernet-encrypted** in the `password` column using the `FERNET_KEY` environment variable. If `FERNET_KEY` is not set, the server raises a `RuntimeError` on the first encrypt/decrypt attempt.
 - The inventory table shows `••••••••` for devices with a password, and `—` for devices with none.
-- A **Show / Hide** toggle calls `GET /reveal-password/{id}` via AJAX. Only the device owner or an admin can reveal the password; others receive `{"error": "Access denied"}`.
+- A **Show / Hide** toggle calls `GET /reveal-password/{id}` via AJAX. Only the **effective controller** (owner or active leasee) or an admin can reveal the password; others receive `{"error": "Access denied"}`.
 - The Edit Device form pre-populates the decrypted password for authorised users. Saving always re-encrypts whatever is in the field. Clearing the field stores an empty string.
 - Password changes are recorded in the audit log as `"****" → "****"`.
 
@@ -314,6 +336,113 @@ Every system event creates rows in the `notifications` table for the relevant re
 **Notifications page** — All notifications for the current user, newest first. Columns: message, related device MAC, received date, requested lease end date, type badge (Request / Renewal), status badge (Pending / Accepted / Declined / Cancelled), and action buttons. All unread rows are automatically marked as read on page visit and are highlighted in pale yellow.
 
 **Accept / Decline** — Buttons appear only on notifications with a linked `request_id` in `pending` status. The server re-checks that the acting user is the device owner before processing.
+
+---
+
+### Excel Import / Export (Admin only)
+
+Admins can bulk-manage device inventory using `.xlsx` files via two endpoints. No UI page exists for these yet — they are used via `curl`, a REST client, or a future frontend form.
+
+---
+
+#### Export (`GET /export`)
+
+Downloads the full `devices` table as an Excel file. Excluded columns that are system-managed (`id`, `password`, `leasee_username`, `lease_expiry`, `lease_warning_sent`) are never included.
+
+**Example — curl:**
+
+```bash
+curl -b "access_token=<your_admin_jwt>" \
+     http://localhost:8000/export \
+     -o devices_export.xlsx
+```
+
+The downloaded file (`devices_export.xlsx`) will look like this:
+
+| mac_address | device_model | owner | availability | reporting_manager | team | ip_address | location | lease |
+|---|---|---|---|---|---|---|---|---|
+| AA:BB:CC:11:22:33 | Raspberry Pi 4 | alice | In Use | bob | Platform | 192.168.1.10 | Lab Rack A | Long-term |
+| DD:EE:FF:44:55:66 | Jetson Nano | | Available | | | 10.0.0.5 | Server Room | |
+
+---
+
+#### Import (`POST /import`)
+
+Accepts a `.xlsx` file and bulk-inserts or updates device records.
+
+- **New MAC address** → row is inserted as a new device.
+- **Existing MAC address** → existing device record is overwritten with values from the file. The response lists every MAC that was overwritten so you know what changed.
+- Rows with validation errors are skipped; the rest are still processed. All valid rows are committed in one transaction.
+
+**Example — curl:**
+
+```bash
+curl -b "access_token=<your_admin_jwt>" \
+     -X POST http://localhost:8000/import \
+     -F "file=@devices_import.xlsx"
+```
+
+**Example response:**
+
+```json
+{
+  "inserted": 2,
+  "overwritten": ["AA:BB:CC:11:22:33"],
+  "errors": [
+    {"row": 4, "message": "Invalid availability: 'unknown'. Must be 'Available' or 'In Use'."},
+    {"row": 7, "message": "MAC address must have exactly 12 hex digits, got: 'ZZ:ZZ'"}
+  ]
+}
+```
+
+---
+
+#### Required Excel Columns
+
+The file must be `.xlsx` format (not `.xls` or `.csv`). The first row must be a header row with column names exactly as shown below (case-sensitive).
+
+| Column | Required | Data Type | Valid Values | Example |
+|---|---|---|---|---|
+| `mac_address` | **Yes** | Text | 12 hex digits in any separator format — normalised to `AA:BB:CC:DD:EE:FF` on import | `AA:BB:CC:11:22:33` or `aabbcc112233` |
+| `device_model` | **Yes** | Text | Any non-empty string | `Raspberry Pi 4`, `Jetson Nano` |
+| `availability` | **Yes** | Text | Exactly `Available` or `In Use` (case-sensitive) | `Available` |
+| `owner` | No | Text | Any username registered in the system, or blank for unowned | `alice` |
+| `reporting_manager` | No | Text | Any string or blank | `bob` |
+| `team` | No | Text | Any string or blank | `Platform` |
+| `ip_address` | No | Text | Valid IPv4 or IPv6 address, or blank | `192.168.1.10` |
+| `location` | No | Text | Any string or blank | `Lab Rack A` |
+| `lease` | No | Text | Any string or blank; free-text admin note | `Long-term`, `Project X` |
+
+> Columns beyond those listed above are ignored.  
+> System-managed columns (`id`, `password`, `leasee_username`, `lease_expiry`, `lease_warning_sent`) cannot be set via import and are silently ignored even if present.
+
+---
+
+#### Validation Rules
+
+| Rule | Behaviour on failure |
+|---|---|
+| File is not `.xlsx` | HTTP 400: `"Only .xlsx files are supported."` — entire import rejected |
+| File cannot be parsed as a valid Excel workbook | HTTP 400: `"Could not parse file."` — entire import rejected |
+| Required column missing from header row | HTTP 400: `"Missing required columns: <name>"` — entire import rejected |
+| `mac_address` is not 12 hex digits | Row skipped; error recorded in `errors` array |
+| `availability` is not `Available` or `In Use` | Row skipped; error recorded in `errors` array |
+| `device_model` is blank | Row skipped; error recorded in `errors` array |
+| All cells in a row are empty | Row silently skipped (treated as padding) |
+| MAC address already exists | Row processed as an update; MAC listed in `overwritten` |
+
+---
+
+#### Minimal Valid Example
+
+A file with only the three required columns is valid:
+
+| mac_address | device_model | availability |
+|---|---|---|
+| 00:11:22:33:44:55 | Arduino Uno | Available |
+| AA:BB:CC:DD:EE:FF | Raspberry Pi 4 | In Use |
+
+All optional columns will be set to `NULL` / empty for newly inserted rows. Existing rows updated this way will have those optional fields cleared.
 
 ---
 
@@ -427,10 +556,10 @@ All endpoints return HTML (Jinja2-rendered pages) except where noted. Auth is vi
 | `GET` | `/inventory` | Yes | Lists all devices; triggers lease-expiry check; accepts `?search=` and `?availability=` |
 | `GET` | `/add` | Yes | Renders the Add Device form |
 | `POST` | `/add` | Yes | Creates a new device; validates MAC and IP; admin can set any owner, user is forced to self |
-| `GET` | `/edit/{id}` | Yes | Renders Edit Device form (owner or admin only); pre-populates decrypted password |
-| `POST` | `/edit/{id}` | Yes | Saves edits; admins edit all fields, users edit operational fields only; logs all changes |
+| `GET` | `/edit/{id}` | Yes | Renders Edit Device form (effective controller or admin only); pre-populates decrypted password |
+| `POST` | `/edit/{id}` | Yes | Saves edits; admins edit all fields, effective controller edits operational fields only; logs all changes |
 | `GET` | `/delete/{id}` | Yes | Deletes a device and logs the event (admin only) |
-| `GET` | `/reveal-password/{id}` | Yes | **JSON** — returns `{"password": "..."}` (owner or admin); `{"error": "..."}` on failure |
+| `GET` | `/reveal-password/{id}` | Yes | **JSON** — returns `{"password": "..."}` (effective controller or admin); `{"error": "..."}` on failure |
 | `GET` | `/api/autocomplete-options` | Yes | **JSON** — returns `{"owners": [...], "reporting_managers": [...], "device_models": [...], "teams": [...]}` |
 
 ### Device Actions
@@ -440,8 +569,8 @@ All endpoints return HTML (Jinja2-rendered pages) except where noted. Auth is vi
 | `POST` | `/claim/{id}` | Yes | Claims an unowned available device; blocked if any pending request exists on the device |
 | `POST` | `/use/{id}` | Yes | Marks an owned available device as `In Use` (owner only) |
 | `POST` | `/reserve/{id}` | Yes | Sets owner + `In Use` in one step on a free device |
-| `POST` | `/release/{id}` | Yes | Releases an `In Use` device; cancels all pending requests; ends any active lease (owner only) |
-| `POST` | `/request/{id}` | Yes | Submits a lease request with a desired end date (non-owner only; date: tomorrow through 7 days) |
+| `POST` | `/release/{id}` | Yes | Releases an `In Use` device; cancels all pending requests; ends any active lease (effective controller — owner or active leasee) |
+| `POST` | `/request/{id}` | Yes | Submits a lease request with a desired end date (non-controller only; date: tomorrow through 7 days) |
 | `POST` | `/renew-lease/{id}` | Yes | Submits a lease renewal (current leasee only; date: expiry+1 through expiry+7 days) |
 
 ### Notifications
@@ -481,6 +610,13 @@ All endpoints return HTML (Jinja2-rendered pages) except where noted. Auth is vi
 | `GET` | `/backups/download/{filename}` | Admin | Serves the `.sql` file as a downloadable attachment |
 | `POST` | `/backups/restore/{filename}` | Admin | Restores the database from the selected backup; requires `confirm=yes` form field |
 | `GET` | `/backups/delete/{filename}` | Admin | Deletes a backup file from disk |
+
+### Excel Import / Export
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/export` | Admin | Downloads all devices as `devices_export.xlsx`; excludes system-managed and password columns |
+| `POST` | `/import` | Admin | Uploads a `.xlsx` file; inserts new rows and overwrites existing ones by MAC address; **JSON response** with `inserted`, `overwritten`, and `errors` counts |
 
 ---
 

@@ -56,6 +56,21 @@
             </div>
 
             <div class="form-field">
+                <label for="project">Project</label>
+                <input type="text" id="project" name="project" value="{{ device['project'] or '' }}">
+            </div>
+
+            <div class="form-field">
+                <label for="console">Console</label>
+                <input type="text" id="console" name="console" value="{{ device['console'] or '' }}">
+            </div>
+
+            <div class="form-field">
+                <label for="power">Power</label>
+                <input type="text" id="power" name="power" value="{{ device['power'] or '' }}">
+            </div>
+
+            <div class="form-field">
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" value="{{ device['decrypted_password'] }}" autocomplete="new-password">
             </div>

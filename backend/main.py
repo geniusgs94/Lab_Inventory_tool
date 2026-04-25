@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
-from routers import auth, backup, devices, history, notifications, users
+from routers import auth, backup, devices, history, importexport, notifications, users
 from services.db import close_pool, init_pool
 
 load_dotenv()
@@ -36,6 +36,7 @@ app.include_router(history.router)
 app.include_router(notifications.router)
 app.include_router(users.router)
 app.include_router(backup.router)
+app.include_router(importexport.router)
 
 _scheduler = BackgroundScheduler()
 

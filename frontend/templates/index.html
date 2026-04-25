@@ -34,6 +34,9 @@
         <th>IP Address</th>
         <th>Location</th>
         <th>Lease</th>
+        <th>Project</th>
+        <th>Console</th>
+        <th>Power</th>
         <th>Password</th>
         <th>Edit</th>
         <th>Action</th>
@@ -53,12 +56,20 @@
 
         <!-- Lease column -->
         <td>
-            {% if device.leasee_username %}
-                {{ device.leasee_username }} (expires: {{ device.lease_expiry.strftime('%b %d, %Y') if device.lease_expiry else 'N/A' }})
+            {% if device.lease_active %}
+                {{ device.leasee_username }}
+                (expires: {{ device.lease_expiry.strftime('%b %d, %Y') if device.lease_expiry else 'N/A' }})
+                <br><small><em>In control: {{ device.effective_controller }}</em></small>
+            {% elif device.leasee_username %}
+                {{ device.leasee_username }} <span title="Lease expired">(expired)</span>
             {% else %}
                 —
             {% endif %}
         </td>
+
+        <td>{{ device.project or '—' }}</td>
+        <td>{{ device.console or '—' }}</td>
+        <td>{{ device.power or '—' }}</td>
 
         <!-- Password column -->
         <td class="pwd-cell">
@@ -72,7 +83,7 @@
 
         <!-- Edit column -->
         <td>
-            {% if session.role == 'admin' or (device.owner or '')|lower|trim == session.username|lower|trim %}
+            {% if session.role == 'admin' or (device.effective_controller or '')|lower|trim == session.username|lower|trim %}
                 <a href="{{ url_for('edit_item', id=device.id) }}" class="btn btn-sm btn-warning" style="margin-bottom:5px; display:inline-block;">Edit</a>
             {% endif %}
             {% if session.role == 'admin' %}
@@ -86,7 +97,9 @@
         <!-- Action column -->
         <td>
             {% set owner = device.owner or '' %}
+            {% set effective_controller = device.effective_controller or '' %}
             {% set is_owner = owner|lower|trim == session.username|lower|trim %}
+            {% set is_controller = effective_controller|lower|trim == session.username|lower|trim %}
             {% set no_owner = not owner or owner|trim == '' %}
             {% set leasee = device.leasee_username or '' %}
             {% set is_leasee = leasee|lower|trim == session.username|lower|trim and leasee|trim != '' %}
@@ -107,8 +120,8 @@
                     <button type="submit" style="background-color:#003366; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">Use</button>
                 </form>
 
-            {% elif device.availability == 'In Use' and is_owner %}
-                {# Owner — Release (warn if active leasee) #}
+            {% elif device.availability == 'In Use' and is_controller %}
+                {# Controller — Release (warn if active leasee) #}
                 <form action="{{ url_for('release_device', id=device.id) }}" method="post" style="display:inline;"
                       {% if has_leasee %}onsubmit="return confirm('Warning: this will also end the active lease by {{ leasee }}. Continue?');"{% endif %}>
                     <button type="submit" style="background-color:#6c757d; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;">Release</button>
@@ -130,7 +143,7 @@
                     </form>
                 {% endif %}
 
-            {% elif device.availability == 'In Use' and not is_owner and not is_leasee %}
+            {% elif device.availability == 'In Use' and not is_controller and not is_leasee %}
                 {# Non-owner non-leasee — Request with date picker #}
                 {% if device.mac_address in my_pending_macs %}
                     <button type="button" disabled style="background-color:#adb5bd; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:not-allowed;">Requested</button>
